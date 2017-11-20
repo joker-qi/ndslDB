@@ -62,6 +62,12 @@ class Slice {
     size_ -= n;
   }
 
+  void go_back(size_t n)
+  {
+    data_ -= n;
+    size_ += n;
+  }
+
   // Return a string that contains the copy of the referenced data.
   std::string ToString() const { return std::string(data_, size_); }
 

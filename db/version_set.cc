@@ -784,7 +784,7 @@ VersionSet::VersionSet(const std::string& dbname,
       next_file_number_(2),
       manifest_file_number_(0),  // Filled by Recover()
       last_sequence_(0),
-      log_number_(0),
+      log_number_(0),//初识时vlog_number为0
       prev_log_number_(0),
       descriptor_file_(NULL),
       descriptor_log_(NULL),
@@ -819,8 +819,8 @@ void VersionSet::AppendVersion(Version* v) {
 
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
-    assert(edit->log_number_ >= log_number_);
-    assert(edit->log_number_ < next_file_number_);
+      assert(edit->log_number_ >= log_number_);
+//    assert(edit->log_number_ < next_file_number_);
   } else {
     edit->SetLogNumber(log_number_);
   }
@@ -1062,6 +1062,11 @@ bool VersionSet::ReuseManifest(const std::string& dscname,
 void VersionSet::MarkFileNumberUsed(uint64_t number) {
   if (next_file_number_ <= number) {
     next_file_number_ = number + 1;
+  }
+}
+void VersionSet::MarkVlogNumberUsed(uint64_t number) {
+  if (log_number_ < number) {
+     log_number_ = number;
   }
 }
 

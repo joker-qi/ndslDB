@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
     CheckCondition(prop != NULL);
     Free(&prop);
   }
-
+/*
   StartPhase("snapshot");
   {
     const leveldb_snapshot_t* snap;
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
     CheckGet(db, roptions, "foo", NULL);
     leveldb_release_snapshot(db, snap);
   }
-
+*/
   StartPhase("repair");
   {
     leveldb_close(db);

@@ -7,9 +7,9 @@
 # to switch between compilation modes.
 
 # (A) Production use (optimized mode)
-OPT ?= -O2 -DNDEBUG
+#OPT ?= -O2 -DNDEBUG
 # (B) Debug mode, w/ full line-level debugging symbols
-# OPT ?= -g2
+ OPT ?= -g2
 # (C) Profiling mode: opt, but w/debugging symbols
 # OPT ?= -O2 -g2 -DNDEBUG
 #-----------------------------------------------
@@ -29,6 +29,7 @@ TESTS = \
 	db/fault_injection_test \
 	db/filename_test \
 	db/log_test \
+	db/vlog_test \
 	db/recovery_test \
 	db/skiplist_test \
 	db/version_edit_test \
@@ -364,6 +365,9 @@ $(STATIC_OUTDIR)/issue200_test:issues/issue200_test.cc $(STATIC_LIBOBJECTS) $(TE
 
 $(STATIC_OUTDIR)/log_test:db/log_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS)
 	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/log_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS) -o $@ $(LIBS)
+
+$(STATIC_OUTDIR)/vlog_test:db/vlog_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS)
+	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/vlog_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS) -o $@ $(LIBS)
 
 $(STATIC_OUTDIR)/recovery_test:db/recovery_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS)
 	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/recovery_test.cc $(STATIC_LIBOBJECTS) $(TESTHARNESS) -o $@ $(LIBS)

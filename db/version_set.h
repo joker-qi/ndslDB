@@ -189,6 +189,7 @@ class VersionSet {
 
   // Allocate and return a new file number
   uint64_t NewFileNumber() { return next_file_number_++; }
+  uint64_t NewVlogNumber() { return ++log_number_; }
 
   // Arrange to reuse "file_number" unless a newer file number has
   // already been allocated.
@@ -196,6 +197,11 @@ class VersionSet {
   void ReuseFileNumber(uint64_t file_number) {
     if (next_file_number_ == file_number + 1) {
       next_file_number_ = file_number;
+    }
+  }
+  void ReuseVlogNumber(uint64_t file_number) {
+    if (log_number_ == file_number) {
+      log_number_ = file_number - 1;
     }
   }
 
@@ -216,6 +222,7 @@ class VersionSet {
 
   // Mark the specified file number as used.
   void MarkFileNumberUsed(uint64_t number);
+  void MarkVlogNumberUsed(uint64_t number);
 
   // Return the current log file number.
   uint64_t LogNumber() const { return log_number_; }

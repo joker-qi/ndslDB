@@ -56,7 +56,8 @@ class WriteBatch {
     virtual void Delete(const Slice& key) = 0;
   };
   Status Iterate(Handler* handler) const;
-
+  Status Iterate(Handler* handler, uint64_t& pos, uint64_t file_numb) const;
+  Status ParseRecord(uint64_t& pos, Slice& key, Slice& value, bool& isDel) const;
  private:
   friend class WriteBatchInternal;
 

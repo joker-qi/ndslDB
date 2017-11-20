@@ -28,6 +28,10 @@ std::string LogFileName(const std::string& name, uint64_t number) {
   assert(number > 0);
   return MakeFileName(name, number, "log");
 }
+std::string VLogFileName(const std::string& name, uint64_t number) {
+//  assert(number > 0);
+  return MakeFileName(name, number, "vlog");
+}
 
 std::string TableFileName(const std::string& name, uint64_t number) {
   assert(number > 0);
@@ -111,7 +115,11 @@ bool ParseFileName(const std::string& fname,
     Slice suffix = rest;
     if (suffix == Slice(".log")) {
       *type = kLogFile;
-    } else if (suffix == Slice(".sst") || suffix == Slice(".ldb")) {
+    }
+    else if (suffix == Slice(".vlog")) {
+      *type = kVLogFile;
+    }
+    else if (suffix == Slice(".sst") || suffix == Slice(".ldb")) {
       *type = kTableFile;
     } else if (suffix == Slice(".dbtmp")) {
       *type = kTempFile;

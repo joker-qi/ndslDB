@@ -69,7 +69,16 @@ class DBIter: public Iterator {
   }
   virtual Slice value() const {
     assert(valid_);
-    return (direction_ == kForward) ? iter_->value() : saved_value_;
+        saved_real_value_.clear();
+    if(direction_ == kForward)
+    {
+        status_ = db_->RealValue(iter_->value(), &saved_real_value_);
+    }//还需要改进，效率太低
+    else
+    {
+        status_ = db_->RealValue(saved_value_, &saved_real_value_);
+    }
+    return saved_real_value_;
   }
   virtual Status status() const {
     if (status_.ok()) {
@@ -113,9 +122,10 @@ class DBIter: public Iterator {
   Iterator* const iter_;
   SequenceNumber const sequence_;
 
-  Status status_;
+  mutable Status status_;
   std::string saved_key_;     // == current key when direction_==kReverse
   std::string saved_value_;   // == current raw value when direction_==kReverse
+  mutable std::string saved_real_value_;//用来存放当前iter对应的真实value，saved_value_仅仅是索引
   Direction direction_;
   bool valid_;
 
@@ -168,6 +178,12 @@ void DBIter::Next() {
   }
 
   FindNextUserEntry(true, &saved_key_);
+  //过滤掉head为key的kv对，因为它不是用户创建的，是我们用来进行恢复的有关vlog的信息
+  while(iter_->Valid() && (key().ToString() == "head" || key().ToString() == "vloginfo"))
+  {
+    SaveKey(ExtractUserKey(iter_->key()), &saved_key_);
+    FindNextUserEntry(true, &saved_key_);
+  }
 }
 
 void DBIter::FindNextUserEntry(bool skipping, std::string* skip) {
@@ -225,8 +241,12 @@ void DBIter::Prev() {
     }
     direction_ = kReverse;
   }
-
   FindPrevUserEntry();
+  //过滤掉head为key的kv对，因为它不是用户创建的，是我们用来进行恢复的有关vlog的信息
+  while(iter_->Valid() && (key().ToString() == "head" || key().ToString() == "vloginfo"))
+  {
+    FindPrevUserEntry();
+  }
 }
 
 void DBIter::FindPrevUserEntry() {
@@ -280,6 +300,11 @@ void DBIter::Seek(const Slice& target) {
   iter_->Seek(saved_key_);
   if (iter_->Valid()) {
     FindNextUserEntry(false, &saved_key_ /* temporary storage */);
+   // if((iter_->Valid() && key().ToString() == "head"))
+    if(iter_->Valid() && (key().ToString() == "head" || key().ToString() == "vloginfo"))
+    {
+        Next();
+    }
   } else {
     valid_ = false;
   }
@@ -291,6 +316,11 @@ void DBIter::SeekToFirst() {
   iter_->SeekToFirst();
   if (iter_->Valid()) {
     FindNextUserEntry(false, &saved_key_ /* temporary storage */);
+   // if((iter_->Valid() && key().ToString() == "head"))
+    if(iter_->Valid() && (key().ToString() == "head" || key().ToString() == "vloginfo"))
+    {
+        Next();
+    }
   } else {
     valid_ = false;
   }
@@ -301,6 +331,11 @@ void DBIter::SeekToLast() {
   ClearSavedValue();
   iter_->SeekToLast();
   FindPrevUserEntry();
+   // if((iter_->Valid() && key().ToString() == "head"))
+    if(iter_->Valid() && (key().ToString() == "head" || key().ToString() == "vloginfo"))
+    {
+        Prev();
+    }
 }
 
 }  // anonymous namespace

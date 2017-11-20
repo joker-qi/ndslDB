@@ -124,6 +124,19 @@ class PosixSequentialFile: public SequentialFile {
     }
     return Status::OK();
   }
+
+  virtual Status SkipFromHead(uint64_t n) {
+   if (fseek(file_, n, SEEK_SET)) {//移动到相对文件头部偏移n的位置
+      return PosixError(filename_, errno);
+    }
+    return Status::OK();
+  }
+  virtual Status DeallocateDiskSpace(uint64_t offset, size_t len)
+  {//释放指定磁盘空间
+      if(fallocate(fileno(file_),FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, len)<0)
+          return PosixError(filename_, errno);
+      return Status::OK();
+  }
 };
 
 // pread() based random-access
@@ -338,7 +351,7 @@ class PosixEnv : public Env {
 
   virtual Status NewSequentialFile(const std::string& fname,
                                    SequentialFile** result) {
-    FILE* f = fopen(fname.c_str(), "r");
+    FILE* f = fopen(fname.c_str(), "r+");//garbager的fallocate需要用写
     if (f == NULL) {
       *result = NULL;
       return PosixError(fname, errno);
@@ -379,7 +392,7 @@ class PosixEnv : public Env {
   virtual Status NewWritableFile(const std::string& fname,
                                  WritableFile** result) {
     Status s;
-    FILE* f = fopen(fname.c_str(), "w");
+    FILE* f = fopen(fname.c_str(), "w");//w写入方式打开，将文件指针指向文件头并将文件大小截为零。如果文件不存在则尝试创建之。
     if (f == NULL) {
       *result = NULL;
       s = PosixError(fname, errno);
@@ -392,6 +405,7 @@ class PosixEnv : public Env {
   virtual Status NewAppendableFile(const std::string& fname,
                                    WritableFile** result) {
     Status s;
+    //"a" 写入方式打开，将文件指针指向文件末尾。如果文件不存在则尝试创建之.所以vlog_writer用的是NewAppendableFile
     FILE* f = fopen(fname.c_str(), "a");
     if (f == NULL) {
       *result = NULL;

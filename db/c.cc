@@ -222,7 +222,7 @@ leveldb_iterator_t* leveldb_create_iterator(
   result->rep = db->rep->NewIterator(options->rep);
   return result;
 }
-
+/*
 const leveldb_snapshot_t* leveldb_create_snapshot(
     leveldb_t* db) {
   leveldb_snapshot_t* result = new leveldb_snapshot_t;
@@ -236,7 +236,7 @@ void leveldb_release_snapshot(
   db->rep->ReleaseSnapshot(snapshot->rep);
   delete snapshot;
 }
-
+*/
 char* leveldb_property_value(
     leveldb_t* db,
     const char* propname) {
@@ -537,13 +537,13 @@ void leveldb_readoptions_set_fill_cache(
     leveldb_readoptions_t* opt, unsigned char v) {
   opt->rep.fill_cache = v;
 }
-
+/*
 void leveldb_readoptions_set_snapshot(
     leveldb_readoptions_t* opt,
     const leveldb_snapshot_t* snap) {
   opt->rep.snapshot = (snap ? snap->rep : NULL);
 }
-
+*/
 leveldb_writeoptions_t* leveldb_writeoptions_create() {
   return new leveldb_writeoptions_t;
 }

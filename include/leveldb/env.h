@@ -192,6 +192,15 @@ class SequentialFile {
   //
   // REQUIRES: External synchronization
   virtual Status Skip(uint64_t n) = 0;
+  virtual Status SkipFromHead(uint64_t n) {//增加一个接口，移到距文件头部n的位置处
+      (void)n;
+      return Status::NotSupported("SkipFromHead");
+  }
+  virtual Status DeallocateDiskSpace(uint64_t offset, size_t len){//增加一个接口，移到距文件头部n的位置处
+      (void)offset;
+      (void)len;
+      return Status::NotSupported("DeallocateDiskSpace");
+  }
 
  private:
   // No copying allowed
