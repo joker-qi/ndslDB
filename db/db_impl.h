@@ -175,6 +175,7 @@ class DBImpl : public DB {
   uint64_t vlog_head_;//当前vlog文件的偏移写
   uint64_t check_point_;//当前vlog文件的重启点
   uint64_t next_check_point_;//当前vlog文件的下一个重启点，check_point_是已经写入到sst文件里
+  uint64_t check_log_;
   uint64_t drop_count_;//合并产生了多少条垃圾记录，这些新产生的信息还没有持久化到sst文件
   VlogManager vlog_manager_;
   std::string vloginfo_;

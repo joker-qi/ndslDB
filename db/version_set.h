@@ -180,6 +180,7 @@ class VersionSet {
 
   // Recover the last saved descriptor from persistent storage.
   Status Recover(bool *save_manifest);
+  Status Recover(bool *save_manifest, uint64_t& log_number, uint64_t& head_pos, bool& has_head_info);
 
   // Return the current version.
   Version* current() const { return current_; }

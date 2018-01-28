@@ -20,7 +20,8 @@ enum Tag {
   kDeletedFile          = 6,
   kNewFile              = 7,
   // 8 was used for large value refs
-  kPrevLogNumber        = 9
+  kPrevLogNumber        = 9,
+  kHead                 = 10
 };
 
 void VersionEdit::Clear() {
@@ -34,6 +35,7 @@ void VersionEdit::Clear() {
   has_prev_log_number_ = false;
   has_next_file_number_ = false;
   has_last_sequence_ = false;
+  has_head_info_ = false;
   deleted_files_.clear();
   new_files_.clear();
 }
@@ -58,6 +60,11 @@ void VersionEdit::EncodeTo(std::string* dst) const {
   if (has_last_sequence_) {
     PutVarint32(dst, kLastSequence);
     PutVarint64(dst, last_sequence_);
+  }
+  if(has_head_info_)
+  {
+    PutVarint32(dst,kHead);
+    dst->append(head_info_, sizeof(head_info_));
   }
 
   for (size_t i = 0; i < compact_pointers_.size(); i++) {
@@ -168,6 +175,14 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
           compact_pointers_.push_back(std::make_pair(level, key));
         } else {
           msg = "compaction pointer";
+        }
+        break;
+
+      case kHead:
+        if(memcpy(head_info_, input.data(), sizeof(head_info_)))
+        {
+            input.remove_prefix(sizeof(head_info_));
+            has_head_info_ = true;
         }
         break;
 

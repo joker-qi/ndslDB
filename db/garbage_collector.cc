@@ -60,12 +60,13 @@ void GarbageCollector::BeginGarbageCollect()
             //log文件里的delete记录可以直接丢掉，因为sst文件会记录
             if(!isDel && db_->GetPtr(read_options, key, &val).ok())
             {
-                uint64_t code = DecodeFixed64(val.data());
-                size_t size = code & 0xffffff;
-                code = code>>24;
-                uint64_t file_numb = code & 0xff;
-                uint64_t item_pos = code>>8;
-                if(item_pos + size == garbage_pos_ && file_numb == vlog_number_ )
+                Slice val_ptr(val);
+                uint32_t file_numb;
+                uint64_t item_pos, item_size;
+                GetVarint64(&val_ptr, &item_size);
+                GetVarint32(&val_ptr, &file_numb);
+                GetVarint64(&val_ptr, &item_pos);
+                if(item_pos + item_size == garbage_pos_ && file_numb == vlog_number_ )
                 {
                     clean_valid_batch.Put(key, value);
                 }

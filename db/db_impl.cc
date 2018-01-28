@@ -309,8 +309,11 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
           dbname_, "exists (error_if_exists is true)");
     }
   }
+bool has_head_info = false;
+uint64_t log_number, head_pos;
+s = versions_->Recover(save_manifest, log_number, head_pos, has_head_info);//ruse manifest文件时save_manifest会继续保持false
 
-  s = versions_->Recover(save_manifest);//ruse manifest文件时save_manifest会继续保持false
+//  s = versions_->Recover(save_manifest);//ruse manifest文件时save_manifest会继续保持false
   if (!s.ok()) {
     return s;
   }
@@ -347,7 +350,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
              static_cast<int>(expected.size()));
     return Status::Corruption(buf, TableFileName(dbname_, *(expected.begin())));
   }
-    ReadOptions options;
+/*    ReadOptions options;
     std::string val;
     SequenceNumber snapshot;
     snapshot = versions_->LastSequence();
@@ -380,7 +383,25 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
         check_point_=0;
     }
     current->Unref();
-    s = Status::OK();
+    s = Status::OK();*/
+  if(has_head_info && !logs.empty())
+  {
+    if(log_number == logs[0])
+        vlog_head_ = head_pos;
+    else
+    {
+        vlog_head_ = 0;
+        assert(log_number < logs[0]);
+        assert(logs.size() == 1);
+    }
+    check_point_ = vlog_head_;
+  }
+  else
+  {
+    vlog_head_ =0;
+    check_point_=0;
+  }
+
    for (size_t i = 0; i < logs.size(); i++) {
         s = RecoverLogFile(logs[i], (i == logs.size() - 1), save_manifest, edit,
                 &max_sequence);
@@ -516,13 +537,14 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
             if (status.ok()) {
                 *save_manifest = true;
                 *max_sequence = *max_sequence + 1;
-                char buf[8];
-                Slice v(buf, 8);//vlog_head_用了3个字节表示大小，也就是说不能超过16M,有问题需要改
-                EncodeFixed64(buf, (vlog_head_ << 24) | log_number);
-                mem->Add(*max_sequence,kTypeValue, Slice("head"),v);
+               /* char buf[8];*/
+                //Slice v(buf, 8);//vlog_head_用了3个字节表示大小，也就是说不能超过16M,有问题需要改
+                //EncodeFixed64(buf, (vlog_head_ << 24) | log_number);
+                /*mem->Add(*max_sequence,kTypeValue, Slice("head"),v);*/
                 next_check_point_ = vlog_head_;//////////
                 check_point_ = next_check_point_;///////////
                 status = WriteLevel0Table(mem, edit, NULL);
+                edit->SetHeadInfo(log_number, vlog_head_);
             }
             mem->Unref();
       }
@@ -599,6 +621,7 @@ void DBImpl::CompactMemTable() {
   Version* base = versions_->current();
   base->Ref();
   Status s = WriteLevel0Table(imm_, &edit, base);
+  edit.SetHeadInfo(check_log_, next_check_point_);
   base->Unref();
 
   if (s.ok() && shutting_down_.Acquire_Load()) {
@@ -1002,6 +1025,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     else if(ikey.user_key == "head")
     {//合并文件的时候去掉老版本的head kv对,这个合并比较特殊，直接和内存中的check_point_比较就好了，因为check_point_代表已经记录到sst中的最新head
     //这里对check_point_的值并不需要强一致性，不需要加锁来获取check_point_
+        assert(false);
         uint64_t code = DecodeFixed64(input->value().data());
         uint64_t pos = code>>24;
         if(pos != check_point_)
@@ -1047,8 +1071,12 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     //小于smallest_snapshot才能丢弃,因为这里是last_sequence_for_key，代表的是上一条kv的seq
     //但现在的kv分离版本(原理上)是不能支持快照功能的
         // Hidden by an newer entry for same user key
-          uint64_t code = DecodeFixed64(input->value().data());
-          uint64_t vlog_numb = (code>>24)&0xff;
+//          uint64_t code = DecodeFixed64(input->value().data());
+          uint32_t vlog_numb;
+          uint64_t size;
+          Slice value = input->value();
+          GetVarint64(&value, &size);
+          GetVarint32(&value, &vlog_numb);
            vlog_manager_.AddDropCount(vlog_numb);
           drop_count_++;
         drop = true;    // (A)
@@ -1554,14 +1582,15 @@ Status DBImpl::MakeRoomForWrite(bool force) {
     //恢复时我们从head对应的vlog起始处开始恢复就好了，相当于设置一个检查点
     uint64_t last_sequence = versions_->LastSequence();
     last_sequence++;
-    char buf[8];
-    Slice v(buf, 8);
-    EncodeFixed64(buf, (vlog_head_ << 24) | logfile_number_ );
-    imm_->Add(last_sequence,kTypeValue, Slice("head"),v);
+  /*  char buf[8];*/
+    //Slice v(buf, 8);
+    //EncodeFixed64(buf, (vlog_head_ << 24) | logfile_number_ );
+    /*imm_->Add(last_sequence,kTypeValue, Slice("head"),v);*/
     versions_->SetLastSequence(last_sequence);//如果sst文件写成功了，head代表vlog文件从head开始的偏移的kv是在
     //mem，需要恢复.如果head的imm没有成功写入到sst中，那么会从上一次写入成功的head开始恢复
     next_check_point_ = vlog_head_;//next_check_point_ 代表将要被刷进sst，它同imm一起
     //被刷入sst,check_point代表已经刷入到sst文件的最新check_point,其实恢复就是从该检查点开始的
+check_log_ = logfile_number_;
       has_imm_.Release_Store(imm_);
       mem_ = new MemTable(internal_comparator_);
       mem_->Ref();

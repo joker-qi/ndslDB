@@ -55,7 +55,12 @@ class VersionEdit {
   void SetCompactPointer(int level, const InternalKey& key) {
     compact_pointers_.push_back(std::make_pair(level, key));
   }
-
+  void SetHeadInfo(uint64_t logfile_number, uint64_t check_point)
+  {
+ //     Slice v(head_info_, 8);
+      EncodeFixed64(head_info_, (check_point << 24) | logfile_number);
+      has_head_info_ = true;
+  }
   // Add the specified file at the specified number.
   // REQUIRES: This version has not been saved (see VersionSet::SaveTo)
   // REQUIRES: "smallest" and "largest" are smallest and largest keys in file
@@ -96,6 +101,8 @@ class VersionEdit {
   bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
+  bool has_head_info_;
+  char head_info_[8];
 
   std::vector< std::pair<int, InternalKey> > compact_pointers_;
   DeletedFileSet deleted_files_;
