@@ -57,9 +57,17 @@ class VersionEdit {
   }
   void SetHeadInfo(uint64_t logfile_number, uint64_t check_point)
   {
- //     Slice v(head_info_, 8);
       EncodeFixed64(head_info_, (check_point << 24) | logfile_number);
       has_head_info_ = true;
+  }
+  void SetTailInfo(uint64_t logfile_number, uint64_t tail_pos)
+  {
+      EncodeFixed64(tail_info_, (tail_pos << 24) | logfile_number);
+      has_tail_info_ = true;
+  }
+  void SetVlogInfo(std::string& vloginfo){
+    vloginfo_ = vloginfo;
+    has_vloginfo_ = true;
   }
   // Add the specified file at the specified number.
   // REQUIRES: This version has not been saved (see VersionSet::SaveTo)
@@ -92,17 +100,21 @@ class VersionEdit {
   typedef std::set< std::pair<int, uint64_t> > DeletedFileSet;
 
   std::string comparator_;
+  std::string vloginfo_;
   uint64_t log_number_;
   uint64_t prev_log_number_;
   uint64_t next_file_number_;
   SequenceNumber last_sequence_;
   bool has_comparator_;
+  bool has_vloginfo_;
   bool has_log_number_;
   bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
   bool has_head_info_;
+  bool has_tail_info_;
   char head_info_[8];
+  char tail_info_[8];
 
   std::vector< std::pair<int, InternalKey> > compact_pointers_;
   DeletedFileSet deleted_files_;

@@ -4,7 +4,7 @@
 
 namespace leveldb {
 
-    VlogManager::VlogManager(uint64_t clean_threshold):clean_threshold_(clean_threshold),now_vlog_(0),cleaning_vlog_(0)
+    VlogManager::VlogManager(uint64_t clean_threshold):clean_threshold_(clean_threshold),now_vlog_(0)
     {
     }
 
@@ -32,15 +32,6 @@ namespace leveldb {
         now_vlog_ = vlog_numb;
     }
 
-    void VlogManager::RemoveCleaningVlog()//与GetVlogToClean对应
-    {
-        assert(cleaning_vlog_>0);
-        std::tr1::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (cleaning_vlog_);
-        delete iter->second.vlog_;
-        manager_.erase(iter);
-        cleaning_vlog_set_.erase(cleaning_vlog_);
-        cleaning_vlog_=0;
-    }
     void VlogManager::RemoveCleaningVlog(uint64_t vlog_numb)//与GetVlogsToClean对应
     {
         std::tr1::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (vlog_numb);
@@ -76,13 +67,9 @@ namespace leveldb {
 
     uint64_t VlogManager::GetVlogToClean()
     {
-        if(cleaning_vlog_ == 0)//数据库open时如果有需要恢复的clean时cleaning_vlog_不为0,
-        {
-            std::tr1::unordered_set<uint64_t>::iterator iter = cleaning_vlog_set_.begin();
-            assert(iter != cleaning_vlog_set_.end());
-            cleaning_vlog_ = *iter;
-        }
-        return cleaning_vlog_;
+       std::tr1::unordered_set<uint64_t>::iterator iter = cleaning_vlog_set_.begin();
+       assert(iter != cleaning_vlog_set_.end());
+       return *iter;
     }
 
     log::VReader* VlogManager::GetVlog(uint64_t vlog_numb)
@@ -137,14 +124,16 @@ namespace leveldb {
         return true;
     }
 
-    void VlogManager::Recover(uint64_t vlog_numb)
+    bool VlogManager::NeedRecover(uint64_t vlog_numb)
     {
         std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.find(vlog_numb);
         if(iter != manager_.end())
         {
             assert(iter->second.count_ >= clean_threshold_);
-            cleaning_vlog_ = vlog_numb;
+            return true;
         }
+        else
+            return false;//不需要recoverclean,即没有清理一半的vlog
     }
 
 }

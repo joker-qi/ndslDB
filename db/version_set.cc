@@ -1028,7 +1028,9 @@ Status VersionSet::Recover(bool *save_manifest) {
   return s;
 }
 
-Status VersionSet::Recover(bool *save_manifest, uint64_t& vlog_number, uint64_t& head_pos, bool& has_head_info) {
+Status VersionSet::Recover(bool *save_manifest, uint64_t& vlog_number,
+                           uint64_t& head_pos, bool& has_head_info,
+                           std::string& vloginfo, std::string& tail_info) {
   struct LogReporter : public log::Reader::Reporter {
     Status* status;
     virtual void Corruption(size_t bytes, const Status& s) {
@@ -1116,6 +1118,18 @@ Status VersionSet::Recover(bool *save_manifest, uint64_t& vlog_number, uint64_t&
           vlog_number = code & 0xffffff;
           head_pos = code>>24;
           has_head_info = true;
+      }
+
+      if(edit.has_tail_info_)
+      {
+       //   tail_info.clear();
+       //   tail_info.append(edit.tail_info_, sizeof(edit.tail_info_));//assign呢会不会好点
+            tail_info.assign(edit.tail_info_, sizeof(edit.tail_info_));
+      }
+
+      if(edit.has_vloginfo_)
+      {
+          vloginfo = edit.vloginfo_;
       }
     }
   }

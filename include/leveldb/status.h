@@ -47,11 +47,7 @@ class Status {
   static Status IOError(const Slice& msg, const Slice& msg2 = Slice()) {
     return Status(kIOError, msg, msg2);
   }
-  static Status CloseInCompactError(const Slice& msg, const Slice& msg2 = Slice()) {
-    return Status(kCloseError, msg, msg2);
-  }
 
-  bool IsCloseInCompact() const { return code() == kCloseError;}
   // Returns true iff the status indicates success.
   bool ok() const { return (state_ == NULL); }
 
@@ -89,7 +85,6 @@ class Status {
     kNotSupported = 3,
     kInvalidArgument = 4,
     kIOError = 5,
-    kCloseError = 6
   };
 
   Code code() const {

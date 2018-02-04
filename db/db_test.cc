@@ -345,7 +345,8 @@ class DBTest {
     return db_->Delete(WriteOptions(), k);
   }
 
-  std::string Get(const std::string& k, const Snapshot* snapshot = NULL) {
+ // std::string Get(const std::string& k, const Snapshot* snapshot = NULL) {
+  std::string Get(const std::string& k){
     ReadOptions options;
    // options.snapshot = snapshot;
     std::string result;
@@ -365,8 +366,6 @@ class DBTest {
     std::string result;
     Iterator* iter = db_->NewIterator(ReadOptions());
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
-    if(iter->key().ToString() == "head" || iter->key().ToString() == "vloginfo")//head kv对不是用户创建的，需要跳过
-        continue;
       std::string s = IterStatus(iter);
       result.push_back('(');
       result.append(s);
@@ -377,8 +376,6 @@ class DBTest {
     // Check reverse iteration results are the reverse of forward results
     size_t matched = 0;
     for (iter->SeekToLast(); iter->Valid(); iter->Prev()) {
-    if(iter->key().ToString() == "head"|| iter->key().ToString() == "vloginfo")//跳过head kv
-        continue;
       ASSERT_LT(matched, forward.size());
       ASSERT_EQ(IterStatus(iter), forward[forward.size() - matched - 1]);
       matched++;
@@ -570,33 +567,24 @@ TEST(DBTest, Empty) {
   } while (ChangeOptions());
 }
 
-//TEST(DBTest,garbageAll)
-//{
-    //Options options = CurrentOptions();
-    //options.clean_threshold = 3;
-    //options.max_vlog_size = 1000;
-    //options.write_buffer_size = 100000;
-    //options.min_clean_threshold = 1;
-    //Reopen(&options);
-    //ASSERT_OK(Put("foo", "v1"));
-    //ASSERT_OK(Put("bar", "b1"));
-    //ASSERT_OK(Put("la", "l1"));
-    //dbfull()->TEST_CompactMemTable();//sst1(2层)
-    //std::string big(100000,'1');
-    //ASSERT_OK(Put(big, "11"));
-    //ASSERT_OK(Put("foo", "v2"));//会生成log2，同时还生成sst2(只含big，它们写在log1里)(1层)
-    //dbfull()->TEST_CompactMemTable();//生成sst3(1层),只含foo
-    //ASSERT_EQ(NumTableFilesAtLevel(1), 2);
-    //dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，无冲突
-    //ASSERT_OK(Put(big, "22"));
-    //ASSERT_OK(Put("foo", "v3"));//生成log3，同时还生成sst2(只含big以及head，它们写在log2里)(0层)
-    //dbfull()->TEST_CompactMemTable();//生成sst4(0层)，包含foo和head
-////    ASSERT_EQ(NumTableFilesAtLevel(0), 3);
-////    ASSERT_EQ(NumTableFilesAtLevel(1), 0);
-   //dbfull()->CleanVlog();//log文件都没有冲突的垃圾记录
-//}
+TEST(DBTest,garbageAll)//为了验证CleanVlog不会清理当前vlog，哪怕该vlog垃圾记录条数大于等于阀值
+{
+    Options options = CurrentOptions();
+    options.min_clean_threshold = 1;
+    Reopen(&options);
+    ASSERT_OK(Put("foo", "v1"));
+    ASSERT_OK(Put("bar", "b1"));
+    dbfull()->TEST_CompactMemTable();//sst1(2层)
+    ASSERT_OK(Put("foo", "v2"));
+    dbfull()->TEST_CompactMemTable();//生成sst2(1层),只含foo
+    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
+    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，foo冲突
+   dbfull()->CleanVlog();//并不会清理log1，虽然log1有一条垃圾信息foo，但因为log1是当前vlog，所以不能被清理
+    ASSERT_EQ("v2", Get("foo"));
+    ASSERT_EQ("b1", Get("bar"));
+}
 
-TEST(DBTest,garbageAll1)
+TEST(DBTest,garbageAllCleanVlog)//测试CleanVlog()
 {
     Options options = CurrentOptions();
     options.clean_threshold = 3;
@@ -618,155 +606,83 @@ TEST(DBTest,garbageAll1)
     ASSERT_EQ(NumTableFilesAtLevel(1), 2);
     dbfull()->TEST_CompactRange(0, NULL, NULL);//导致1和0层合并，冲突,log2的foo失效
     dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，冲突,log1的foo和big失效
-   dbfull()->CleanVlog();
+   dbfull()->CleanVlog();//会把log1和log2都删除掉，同时把log1的l1/la以及log2的big/22重新put,其中会把他们放在mem里，并且写入log3中
     ASSERT_EQ("v3", Get("foo"));
     ASSERT_EQ("22", Get(big));
     ASSERT_EQ("l1", Get("la"));
 }
-/*
-TEST(DBTest,garbage)
+
+TEST(DBTest,garbage)////检验reopen时能否恢复vloginfo
 {
     Options options = CurrentOptions();
     options.clean_threshold = 3;
-    options.max_vlog_size = 10000;
-    options.write_buffer_size = 100000;
+    options.max_vlog_size = 1000;
     options.log_dropCount_threshold = 1;
-      Reopen(&options);
+    Reopen(&options);
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_OK(Put("bar", "b1"));
-    ASSERT_OK(Put("foo", "v2"));
     ASSERT_OK(Put("la", "l1"));
-   dbfull()->TEST_CompactMemTable();//生成sst，在第2层
+    dbfull()->TEST_CompactMemTable();//生成sst，在第2层
     ASSERT_OK(Put("foo", "v3"));
     ASSERT_OK(Put("bar", "b2"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog
-    //合并后生成的vloginfo在mem中
-    ASSERT_EQ(NumTableFilesAtLevel(0), 0);
-Reopen(&options);//测试重新打开时恢复vloginfo信息,vloginfo在reopen前是在mem中，所以会生成新的sst
-    ASSERT_EQ(NumTableFilesAtLevel(0), 1);
-    std::string big(100000,'1');
-    ASSERT_OK(Put(big, "11"));
-    ASSERT_OK(Put("bar", "b3"));//生成新的vlog,同时也会生成sst，bar/b3不会在新生成的sst中
-    DelayMilliseconds(1000);
-    ASSERT_EQ(NumTableFilesAtLevel(0), 2);//第一层的文件就是big/11以及head  和vloginfo和head
-    dbfull()->TEST_CompactRange(0, NULL, NULL);//导致1和0层合并,没有drop，所以不会put vloginfo
-    dbfull()->TEST_CompactMemTable();//刷bar/v3,生成sst，在第1层
-    ASSERT_EQ(NumTableFilesAtLevel(0), 1);
-    dbfull()->TEST_CompactRange(0, NULL, NULL);//导致1和0层合并
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，会触发垃圾回收
-    ASSERT_OK(Put("a", "va"));//为了检验一边垃圾回收的同时也能一边插入
-//    ASSERT_OK(Put("c", "vc"));
-    ASSERT_EQ("v3", Get("foo"));//垃圾回收时候因为回收了big，所以还会生成新的log
-Reopen(&options);//为了检测在clean进行到一半时候关闭数据库，clean线程会记录tail
-    ASSERT_OK(Put("c", "vc"));
-    DelayMilliseconds(1000);//等垃圾回收完成
+    dbfull()->TEST_CompactMemTable();//生成sst在第1层
+    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog而且只有2条垃圾信息
+    Reopen(&options);
+    std::string big(1000,'1');
+    ASSERT_OK(Put("big", big));
+    ASSERT_OK(Put("bar", "b3"));
+    dbfull()->TEST_CompactMemTable();//生成sst在第1层,生成新的vlog2
+    ASSERT_EQ(NumTableFilesAtLevel(2), 1);//第2层的文件就是big/11  以及前面1和2层合并后的文件
+    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
+    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，多了一条垃圾记录bar，刚好够3，会触发vlog1的垃圾回收
+    //能触发垃圾回收说明vloginfo数据在reopen时成功恢复了
+    DelayMilliseconds(100);//等垃圾回收完成
     ASSERT_EQ("v3", Get("foo"));
-    ASSERT_EQ("11", Get(big));
+    ASSERT_EQ(big, Get("big"));
     ASSERT_EQ("b3", Get("bar"));
-    ASSERT_EQ("vc", Get("c"));
-    ASSERT_EQ("va", Get("a"));
 }
-TEST(DBTest,garbage2)
+
+static std::string Key(int i) {
+  char buf[100];
+  snprintf(buf, sizeof(buf), "key%06d", i);
+  return std::string(buf);
+}
+
+TEST(DBTest,RecoverGarbageByTail)//检验reopen后能否根据tail继续上一次clean未完成的vlog的清理
 {
     Options options = CurrentOptions();
     options.clean_threshold = 3;
-    options.max_vlog_size = 1000;
-    options.write_buffer_size = 100000;
-      Reopen(&options);
+    const int N = 50;
+    options.max_vlog_size = 6000 * 50;
+    //不要这句，是为了检验db_impl析构时会判断是否需要持久化当前vloginfo
+// options.log_dropCount_threshold = 1;
+
+    Reopen(&options);
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_OK(Put("bar", "b1"));
+    ASSERT_OK(Put("tom", "t1"));
+
+    for (int i = 0; i < N; i++) {
+        ASSERT_OK(Put(Key(i), Key(i) + std::string(6000, 'v')));
+    }
+    dbfull()->TEST_CompactMemTable();//生成sst，在第2层
     ASSERT_OK(Put("foo", "v2"));
- //   ASSERT_OK(Put("foo1", "v"));
-   dbfull()->TEST_CompactMemTable();//生成sst，在第2层
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-    ASSERT_OK(Put("foo", "v3"));
     ASSERT_OK(Put("bar", "b2"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog
-    //生成了vloginfo在mem中
-    ASSERT_EQ(NumTableFilesAtLevel(0), 0);
-    ASSERT_EQ(NumTableFilesAtLevel(1), 0);
-    ASSERT_EQ(NumTableFilesAtLevel(0), 1);
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-    std::string big(100000,'1');
-    ASSERT_OK(Put(big, "11"));
-    ASSERT_OK(Put("bar", "b3"));//生成新的vlog,同时也会生成sst，bar/b3不会在新生成的sst中
-    DelayMilliseconds(1000);
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，没有drop，所以不会put vloginfo
-    ASSERT_EQ(NumTableFilesAtLevel(1), 0);
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-    dbfull()->TEST_CompactMemTable();//刷bar/v3,生成sst，在第1层
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，会触发垃圾回收
-    ASSERT_EQ("v3", Get("foo"));
-    ASSERT_OK(Put("a", "va"));//为了检验一边垃圾回收的同时也能一边插入
-    ASSERT_OK(Put("b", "vb"));
-    ASSERT_OK(Put("c", "vc"));
-    ASSERT_OK(Put("a", "va2"));
-    ASSERT_OK(Put("b", "vb2"));
-    ASSERT_OK(Put("c", "vc2"));//这些全都在因为big(垃圾回收big)生成新vlog前写入到旧vlog中了
-    DelayMilliseconds(1000);//等垃圾回收完成
-    ASSERT_EQ("v3", Get("foo"));
-    ASSERT_EQ("11", Get(big));
-    ASSERT_EQ("b3", Get("bar"));
-    ASSERT_OK(Put("a", "va3"));
-//    ASSERT_OK(Put("b", "vb3"));
-//    ASSERT_OK(Put("c", "vc3"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
+    ASSERT_OK(Put("tom", "t2"));
+    dbfull()->TEST_CompactMemTable();//生成sst，在第2层
     dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，触发垃圾回收
-    ASSERT_EQ("va3", Get("a"));
-    ASSERT_EQ("vb2", Get("b"));
-    DelayMilliseconds(1000);//等垃圾回收完成
-    ASSERT_EQ("vc2", Get("c"));
-}*/
-/*
-TEST(DBTest,garbage1)
-{
-    Options options = CurrentOptions();
-    options.clean_threshold = 3;
-    options.max_vlog_size = 1000;
-    options.write_buffer_size = 100000;
-      Reopen(&options);
-    ASSERT_OK(Put("foo", "v1"));
-    ASSERT_OK(Put("bar", "b1"));
-    ASSERT_OK(Put("foo", "v2"));
-   dbfull()->TEST_CompactMemTable();//生成sst，在第2层
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
     ASSERT_OK(Put("foo", "v3"));
-    ASSERT_OK(Put("bar", "b2"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog
-    std::string big(100000,'1');
-    ASSERT_OK(Put(big, "11"));
-    ASSERT_OK(Put("bar", "b3"));//生成新的vlog,同时也会生成sst，bar/b3不会在新生成的sst中
-    DelayMilliseconds(1000);
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);//第一层的文件就是big/11以及head
-    ASSERT_OK(Delete(big));
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收
-    ASSERT_EQ(NumTableFilesAtLevel(1), 0);
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-    dbfull()->TEST_CompactMemTable();//刷bar/v3 del big,生成sst，在第1层
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，会触发垃圾回收
+    ASSERT_OK(Put("jack", "j1"));
+    Reopen(&options);//检验是否能从tail恢复垃圾回收
     ASSERT_EQ("v3", Get("foo"));
-    ASSERT_OK(Put("a", "va"));//为了检验一边垃圾回收的同时也能一边插入
-    ASSERT_OK(Put("b", "vb"));
-    ASSERT_OK(Put("a", "va2"));
-    ASSERT_OK(Put("b", "vb2"));//这些全都在Put("bar", "b3")时生成的新vlog中
-//    DelayMilliseconds(1000);//等垃圾回收完成
-    ASSERT_EQ("v3", Get("foo"));
-    ASSERT_EQ("NOT_FOUND", Get("big"));
-    ASSERT_EQ("b3", Get("bar"));
-    ASSERT_OK(Put("a", "va3"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收
-    ASSERT_EQ("va3", Get("a"));
-    ASSERT_EQ("vb2", Get("b"));
+    ASSERT_EQ("b2", Get("bar"));
+    ASSERT_EQ("j1", Get("jack"));
+
+    for (int i = 0; i < N; i++) {
+        ASSERT_EQ(Key(i) + std::string(6000, 'v'), Get(Key(i)));
+    }
 }
-*/
+
 TEST(DBTest, VlogManager)
 {
     VlogManager vlog_manager(3);
@@ -774,13 +690,13 @@ TEST(DBTest, VlogManager)
     log::VReader* vlog_reader[10];
     for(uint32_t i = 0; i < 10; i++)
     {
-    std::string vlog_name = VLogFileName("db", i);
-    SequentialFile* vlr_file;
-    env->NewSequentialFile(vlog_name, &vlr_file);
-    vlog_reader[i] = new log::VReader(vlr_file, true,0);
-    vlog_manager.AddVlog(i, vlog_reader[i]);
+        std::string vlog_name = VLogFileName("db", i);
+        SequentialFile* vlr_file;
+        env->NewSequentialFile(vlog_name, &vlr_file);
+        vlog_reader[i] = new log::VReader(vlr_file, true,0);
+        vlog_manager.AddVlog(i, vlog_reader[i]);
     }
-        vlog_manager.AddDropCount(7);
+    vlog_manager.AddDropCount(7);
     for(int i = 0; i< 4; i++)
     {
         vlog_manager.AddDropCount(8);
@@ -793,11 +709,11 @@ TEST(DBTest, VlogManager)
     log::VReader* vlog_reader1[10];
     for(uint32_t i = 0; i < 10; i++)
     {
-    std::string vlog_name = VLogFileName("db", i);
-    SequentialFile* vlr_file;
-    env->NewSequentialFile(vlog_name, &vlr_file);
-    vlog_reader1[i] = new log::VReader(vlr_file, true,0);
-    vlog_manager1.AddVlog(i, vlog_reader1[i]);
+        std::string vlog_name = VLogFileName("db", i);
+        SequentialFile* vlr_file;
+        env->NewSequentialFile(vlog_name, &vlr_file);
+        vlog_reader1[i] = new log::VReader(vlr_file, true,0);
+        vlog_manager1.AddVlog(i, vlog_reader1[i]);
     }
     ASSERT_TRUE(vlog_manager1.Deserialize(str));
     for(uint32_t i = 0; i < 10; i++)
@@ -812,88 +728,21 @@ TEST(DBTest, VlogManager)
         numb = vlog_manager.GetVlogToClean();
         numb1 = vlog_manager1.GetVlogToClean();
         ASSERT_EQ(numb1,numb);
-        vlog_manager.RemoveCleaningVlog();
-        vlog_manager1.RemoveCleaningVlog();
+        vlog_manager.RemoveCleaningVlog(numb);
+        vlog_manager1.RemoveCleaningVlog(numb1);
     }
-        ASSERT_TRUE(!vlog_manager.HasVlogToClean());
-        ASSERT_TRUE(!vlog_manager1.HasVlogToClean());
-}
-
-/*
-TEST(DBTest,garbage)
-{
-      Options options = CurrentOptions();
-      options.clean_threshold = 3;
-      Reopen(&options);
-    ASSERT_OK(Put("foo", "v1"));
-    ASSERT_OK(Put("bar", "b1"));
-    ASSERT_OK(Put("foo", "v2"));
-   dbfull()->TEST_CompactMemTable();//生成sst，在第2层
-    ASSERT_OK(Put("foo", "v3"));
-    ASSERT_OK(Put("bar", "b2"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层
-    ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，会触发垃圾回收
-        // Step 4: Wait for compaction and clean to finish
-    ASSERT_OK(Put("a", "va"));//为了检验一边垃圾回收的同时也能一边插入
-    ASSERT_OK(Put("b", "vb"));
-    ASSERT_OK(Put("c", "vc"));
-    ASSERT_OK(Put("a", "va2"));
-    ASSERT_OK(Put("b", "vb2"));
-    ASSERT_OK(Put("c", "vc2"));
-    DelayMilliseconds(1000);//等垃圾回收完成
-    ASSERT_EQ("v3", Get("foo"));
-    ASSERT_EQ("b2", Get("bar"));
-    dbfull()->TEST_CompactMemTable();//生成sst在第一层，因为b和第二层冲突
-    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-    ASSERT_EQ("va2", Get("a"));
-    ASSERT_EQ("vb2", Get("b"));
-    ASSERT_EQ("vc2", Get("c"));
-    dbfull()->TEST_CompactRange(1, NULL, NULL);//又一次触发了垃圾回收
-    DelayMilliseconds(1000);
-    ASSERT_EQ("va2", Get("a"));
-    ASSERT_EQ("vb2", Get("b"));
-    ASSERT_EQ("vc2", Get("c"));
-    Compact("a","z");//这一次不会触发垃圾回收，因为合并过程中加了限定，只有那些pos大于tail的
-    //重复的kv对drop时才会触发垃圾回收
-    DelayMilliseconds(1000);
-}
-*/
-TEST(DBTest,CleanVlog)
-{
-      Options options = CurrentOptions();
-      options.clean_threshold = 3;
- //  DestroyAndReopen(&options);
-   Reopen(&options);
-    ASSERT_OK(Put("foo", "v1"));
-    ASSERT_OK(Put("bar", "b1"));
-    ASSERT_OK(Put("foo", "v2"));
-   dbfull()->TEST_CompactMemTable();//生成sst，在第2层
-   ASSERT_OK(Put("foo", "v3"));
-    ASSERT_OK(Put("bar", "b2"));
-//   dbfull()->TEST_CompactMemTable();
-    dbfull()->CleanVlog();
-//    ASSERT_OK();
+    ASSERT_TRUE(!vlog_manager.HasVlogToClean());
+    ASSERT_TRUE(!vlog_manager1.HasVlogToClean());
 }
 
 TEST(DBTest, ReadWrite) {
   do {
-    uint64_t size = 1*1024*1024*1024;
-    size = size *4 - 1;
- //   char* b = new char[2*1024*1024*1024];
-    std::string big(size,'1');
- //   std::string big(b, 2*1024*1024*1024);
- //   ASSERT_OK(Put("", big));
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_EQ("v1", Get("foo"));
     ASSERT_OK(Put("bar", "v2"));
-  //  ASSERT_EQ(big, Get(""));
     ASSERT_OK(Put("foo", "v3"));
- //   dbfull()->TEST_Clean();
- //   sleep(10);
     ASSERT_EQ("v3", Get("foo"));
     ASSERT_EQ("v2", Get("bar"));
-  //  delete[] b;
   } while (ChangeOptions());
 }
 
@@ -914,7 +763,7 @@ TEST(DBTest, GetFromImmutableLayer) {
     options.env = env_;
     options.write_buffer_size = 100000;  // Small write buffer
     Reopen(&options);
-//    DestroyAndReopen(&options);
+
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_EQ("v1", Get("foo"));
 //加它的是为了增大sync的时间，builder sst的最后会调用sync
@@ -993,7 +842,7 @@ TEST(DBTest, GetOrderedByLevels) {
     ASSERT_EQ("v2", Get("foo"));
   } while (ChangeOptions());
 }
-
+//从immem刷入生成的sst会pick一个合适的层放入，见WriteLevel0Table的PickLevelForMemTableOutput
 TEST(DBTest, GetPicksCorrectFile) {
   do {
     // Arrange to have multiple files in a non-level-0 level.
@@ -1280,29 +1129,6 @@ TEST(DBTest, RecoverDuringMemtableCompaction) {
     Options options = CurrentOptions();
     options.env = env_;
     options.write_buffer_size = 1000000;
-    Reopen(&options);
-
-    // Trigger a long memtable compaction and reopen the database during it
-    ASSERT_OK(Put("foo", "v1"));                         // Goes to 1st log file
-    std::string big1(1000000, '1');//因为我们是kv分离的，大v对触发合并无效，因此应大k
-    std::string big2(1000, '2');
-    ASSERT_OK(Put(big1, std::string(1000000, 'x')));  // Fills memtable
-    ASSERT_OK(Put(big2, std::string(1000, 'y')));      // Triggers compaction
-    ASSERT_OK(Put("bar", "v2"));
-
-    Reopen(&options);//太快以至于上次合并没完成，会在recovervlog回放日志时mem超过size而生成sst文件
-    ASSERT_EQ("v1", Get("foo"));
-    ASSERT_EQ("v2", Get("bar"));
-    ASSERT_EQ(std::string(1000000, 'x'), Get(big1));
-    ASSERT_EQ(std::string(1000, 'y'), Get(big2));
-  } while (ChangeOptions());
-}
-
-TEST(DBTest, RecoverDuringMemtableCompactionAndchangeVlog) {
-  do {
-    Options options = CurrentOptions();
-    options.env = env_;
-    options.write_buffer_size = 1000000;
     options.max_vlog_size = 1000000;
     Reopen(&options);
 
@@ -1311,21 +1137,15 @@ TEST(DBTest, RecoverDuringMemtableCompactionAndchangeVlog) {
     std::string big1(1000000, '1');//因为我们是kv分离的，大v对触发合并无效，因此应大k
     std::string big2(1000, '2');
     ASSERT_OK(Put(big1, std::string(1000000, 'x')));  // Fills memtable
-    ASSERT_OK(Put(big2, std::string(1000, 'y')));      // Triggers compaction，生成vlog2，这条记录就是写在vlog2的
-    ASSERT_OK(Put("bar", "v2"));
+    ASSERT_OK(Put(big2, std::string(1000, 'y')));      // Triggers compaction
+    ASSERT_OK(Put("bar", "v2"));                     //big2和bar都会记录在新日志Goes to new log file
 
-    Reopen(&options);//太快以至于上次合并没完成，还没有写入manifest文件中，因此从vlog1的头部开始恢复
+    Reopen(&options);//太快以至于上次合并没完成，会在recovervlog回放日志时mem超过size而生成sst文件
     ASSERT_EQ("v1", Get("foo"));
     ASSERT_EQ("v2", Get("bar"));
     ASSERT_EQ(std::string(1000000, 'x'), Get(big1));
     ASSERT_EQ(std::string(1000, 'y'), Get(big2));
   } while (ChangeOptions());
-}
-
-static std::string Key(int i) {
-  char buf[100];
-  snprintf(buf, sizeof(buf), "key%06d", i);
-  return std::string(buf);
 }
 
 TEST(DBTest, MinorCompactionsHappen) {
@@ -1353,7 +1173,7 @@ TEST(DBTest, MinorCompactionsHappen) {
   }
 }
 
-TEST(DBTest, RecoverWithLargeLog) {
+TEST(DBTest, RecoverWithLargeLog) {//reopen恢复时减小了write_buffer_size，会在恢复过程中生成多个sst
   {
     Options options = CurrentOptions();
     Reopen(&options);//kv分离测试用例中，k大才会触发合并，所以需要大k
@@ -1396,18 +1216,18 @@ TEST(DBTest, CompactionsGenerateMultipleFiles) {
   }
 
   // Reopening moves updates to level-0
-  Reopen(&options);
+  Reopen(&options);//会在level0生成一个远超sst文件大小上限的大sst文件
   dbfull()->TEST_CompactRange(0, NULL, NULL);
 
   ASSERT_EQ(NumTableFilesAtLevel(0), 0);
-  ASSERT_GT(NumTableFilesAtLevel(1), 1);
+  ASSERT_GT(NumTableFilesAtLevel(1), 1);//合并过程会拆分成多个sst文件，因为前面write_buffer_size太大
   for (int i = 0; i < 80; i++) {
 //    ASSERT_EQ(Get(Key(i)), values[i]);
     ASSERT_EQ(Get(keys[i]), Key(i));
   }
 }
 
-TEST(DBTest, RepeatedWritesToSameKey) {
+TEST(DBTest, RepeatedWritesToSameKey) {//验证level0层可以文件冲突，其余层不允许文件间范围冲突
   Options options = CurrentOptions();
   options.env = env_;
   options.write_buffer_size = 100000;  // Small write buffer
@@ -1416,11 +1236,13 @@ TEST(DBTest, RepeatedWritesToSameKey) {
   // We must have at most one file per level except for level-0,
   // which may have up to kL0_StopWritesTrigger files.
   const int kMaxFiles = config::kNumLevels + config::kL0_StopWritesTrigger;
-
-  Random rnd(301);
-  std::string value = RandomString(&rnd, 2 * options.write_buffer_size);
+//因为key都一样，所以大于0层的各层最多只能有1个文件，因此db的所有sst文件数小于等于config::kNumLevels + config::kL0_StopWritesTrigger;
+//  Random rnd(301);
+//  std::string value = RandomString(&rnd, 2 * options.write_buffer_size);
+  std::string key(2 * options.write_buffer_size,'k');//kv分离版本，key大才有用
   for (int i = 0; i < 5 * kMaxFiles; i++) {
-    Put("key", value);
+    //Put("key", value);
+    Put(key, Key(i));
     ASSERT_LE(TotalTableFiles(), kMaxFiles);
     fprintf(stderr, "after %d: %d files\n", int(i+1), TotalTableFiles());
   }
@@ -1651,17 +1473,17 @@ TEST(DBTest, DeletionMarkers1) {
   ASSERT_OK(dbfull()->TEST_CompactMemTable());  // Moves to level last-2
   ASSERT_EQ(AllEntriesFor("foo"), "[ v2, DEL, v1 ]");
   Slice z("z");
-  dbfull()->TEST_CompactRange(last-2, NULL, &z);
+  dbfull()->TEST_CompactRange(last-2, NULL, &z);//foo/v2和foo/del冲突，后者会消失在sst中
   // DEL eliminated, but v1 remains because we aren't compacting that level
   // (DEL can be eliminated because v2 hides v1).
   ASSERT_EQ(AllEntriesFor("foo"), "[ v2, v1 ]");
-  dbfull()->TEST_CompactRange(last-1, NULL, NULL);
+  dbfull()->TEST_CompactRange(last-1, NULL, NULL);//foo/v2和foo/v1冲突，后者会消失在sst中
   // Merging last-1 w/ last, so we are the base level for "foo", so
   // DEL is removed.  (as is v1).
   ASSERT_EQ(AllEntriesFor("foo"), "[ v2 ]");
 }
 
-TEST(DBTest, DeletionMarkers2) {
+TEST(DBTest, DeletionMarkers2) {//验证del只有在合并时候才会真正删除记录，同时若其他层均无该k对应的记录，该del记录也可以删掉
   Put("foo", "v1");
   ASSERT_OK(dbfull()->TEST_CompactMemTable());
   const int last = config::kMaxMemCompactLevel;
@@ -1687,7 +1509,7 @@ TEST(DBTest, DeletionMarkers2) {
   ASSERT_EQ(AllEntriesFor("foo"), "[ ]");
 }
 
-TEST(DBTest, OverlapInLevel0) {
+TEST(DBTest, OverlapInLevel0) {//level0层不同sst文件中同时包含一条相同k的put与del操作,get会返回not find
   do {
     ASSERT_EQ(config::kMaxMemCompactLevel, 2) << "Fix test to match config";
 
@@ -1713,8 +1535,10 @@ TEST(DBTest, OverlapInLevel0) {
     dbfull()->TEST_CompactMemTable();
     ASSERT_EQ("2,1,1", FilesPerLevel());
 
+    ASSERT_EQ("2,1,1", FilesPerLevel());
     // Compact away the placeholder files we created initially
     dbfull()->TEST_CompactRange(1, NULL, NULL);
+    ASSERT_EQ("2", FilesPerLevel());
     dbfull()->TEST_CompactRange(2, NULL, NULL);
     ASSERT_EQ("2", FilesPerLevel());
 
@@ -1794,7 +1618,7 @@ TEST(DBTest, ComparatorCheck) {
       << s.ToString();
 }
 
-TEST(DBTest, CustomComparator) {
+TEST(DBTest, CustomComparator) {//使用自定义的Comparator作为userComparator
   class NumberComparator : public Comparator {
    public:
     virtual const char* Name() const { return "test.NumberComparator"; }
@@ -1811,8 +1635,6 @@ TEST(DBTest, CustomComparator) {
    private:
     static int ToNumber(const Slice& x) {
       // Check that there are no extra characters.
-      if(x.ToString() == "head" || x.ToString() == "vloginfo")//head转化为-1
-          return -1;
       ASSERT_TRUE(x.size() >= 2 && x[0] == '[' && x[x.size()-1] == ']')
           << EscapeString(x);
       int val;
@@ -1860,13 +1682,11 @@ TEST(DBTest, ManualCompaction) {
 
   // Compaction range falls before files
   Compact("", "c");
-//  ASSERT_EQ("1,1,1", FilesPerLevel());
-  ASSERT_EQ("2,1,1", FilesPerLevel());//0层多了个只包含head的文件
+  ASSERT_EQ("1,1,1", FilesPerLevel());
 
   // Compaction range falls after files
   Compact("r", "z");
-//  ASSERT_EQ("1,1,1", FilesPerLevel());
-  ASSERT_EQ("3,1,1", FilesPerLevel());//同上
+  ASSERT_EQ("1,1,1", FilesPerLevel());
 
   // Compaction range overlaps files
   Compact("p1", "p9");
@@ -1874,19 +1694,15 @@ TEST(DBTest, ManualCompaction) {
 
   // Populate a different range
   MakeTables(3, "c", "e");
-//  ASSERT_EQ("1,1,2", FilesPerLevel());
-//  因为第2层的文件含有head，所以会和2层文件有冲突，因此第一个产生的ce文件会放在第一层，第二个ce会在
-//  0层，第三个也在0层
-  ASSERT_EQ("2,1,1", FilesPerLevel());
+  ASSERT_EQ("1,1,2", FilesPerLevel());
 
   // Compact just the new range
   Compact("b", "f");
-//  ASSERT_EQ("0,0,2", FilesPerLevel());//因为第二层不包含ce文件，所以不会进行合并
-  ASSERT_EQ("0,1,1", FilesPerLevel());
+  ASSERT_EQ("0,0,2", FilesPerLevel());
+
   // Compact all
   MakeTables(1, "a", "z");
-//  ASSERT_EQ("0,1,2", FilesPerLevel());
-  ASSERT_EQ("1,1,1", FilesPerLevel());
+  ASSERT_EQ("0,1,2", FilesPerLevel());
   db_->CompactRange(NULL, NULL);
   ASSERT_EQ("0,0,1", FilesPerLevel());
 }

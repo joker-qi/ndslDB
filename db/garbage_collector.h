@@ -8,14 +8,15 @@
 namespace leveldb{
 class VReader;
 class DBImpl;
+class VersionEdit;
 
 class GarbageCollector
 {
     public:
-        GarbageCollector(DBImpl* db):db_(db){}
+        GarbageCollector(DBImpl* db):vlog_number_(0), garbage_pos_(0), vlog_reader_(NULL), db_(db){}
         ~GarbageCollector(){delete vlog_reader_;}
         void SetVlog(uint64_t vlog_number, uint64_t garbage_beg_pos=0);
-        void BeginGarbageCollect();
+        void BeginGarbageCollect(VersionEdit* edit, bool* save_edit);
 
     private:
         uint64_t vlog_number_;

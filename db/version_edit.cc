@@ -21,21 +21,26 @@ enum Tag {
   kNewFile              = 7,
   // 8 was used for large value refs
   kPrevLogNumber        = 9,
-  kHead                 = 10
+  kHead                 = 10,
+  kVloginfo             = 11,
+  kTail                 = 12
 };
 
 void VersionEdit::Clear() {
   comparator_.clear();
+  vloginfo_.clear();
   log_number_ = 0;
   prev_log_number_ = 0;
   last_sequence_ = 0;
   next_file_number_ = 0;
   has_comparator_ = false;
+  has_vloginfo_ = false;
   has_log_number_ = false;
   has_prev_log_number_ = false;
   has_next_file_number_ = false;
   has_last_sequence_ = false;
   has_head_info_ = false;
+  has_tail_info_ = false;
   deleted_files_.clear();
   new_files_.clear();
 }
@@ -65,6 +70,16 @@ void VersionEdit::EncodeTo(std::string* dst) const {
   {
     PutVarint32(dst,kHead);
     dst->append(head_info_, sizeof(head_info_));
+  }
+  if(has_tail_info_)
+  {
+    PutVarint32(dst,kTail);
+    dst->append(tail_info_, sizeof(tail_info_));
+  }
+  if(has_vloginfo_)
+  {
+      PutVarint32(dst,kVloginfo);
+      PutLengthPrefixedSlice(dst, vloginfo_);
   }
 
   for (size_t i = 0; i < compact_pointers_.size(); i++) {
@@ -137,6 +152,15 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
         }
         break;
 
+      case kVloginfo:
+        if (GetLengthPrefixedSlice(&input, &str)) {
+          vloginfo_ = str.ToString();
+          has_vloginfo_ = true;
+        } else {
+          msg = "vloginfo";
+        }
+        break;
+
       case kLogNumber:
         if (GetVarint64(&input, &log_number_)) {
           has_log_number_ = true;
@@ -183,6 +207,14 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
         {
             input.remove_prefix(sizeof(head_info_));
             has_head_info_ = true;
+        }
+        break;
+
+      case kTail:
+        if(memcpy(tail_info_, input.data(), sizeof(tail_info_)))
+        {
+            input.remove_prefix(sizeof(tail_info_));
+            has_tail_info_ = true;
         }
         break;
 

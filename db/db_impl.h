@@ -8,7 +8,7 @@
 #include <deque>
 #include <set>
 #include "db/dbformat.h"
-#include "db/log_writer.h"//可以去掉
+#include "db/log_writer.h"
 #include "db/vlog_writer.h"
 #include "db/vlog_reader.h"
 #include "db/snapshot.h"
@@ -166,30 +166,22 @@ class DBImpl : public DB {
   MemTable* mem_;
   MemTable* imm_;                // Memtable being compacted
   port::AtomicPointer has_imm_;  // So bg thread can detect non-NULL imm_
-//  WritableFile* logfile_;
   uint64_t logfile_number_;//当前vlog文件的编号
-//  uint64_t vlogfile_number_;
-//  log::Writer* log_;
   log::VWriter* vlog_; //写vlog的包装类
   WritableFile* vlogfile_;//vlog文件写打开
   uint64_t vlog_head_;//当前vlog文件的偏移写
-  uint64_t check_point_;//当前vlog文件的重启点
-  uint64_t next_check_point_;//当前vlog文件的下一个重启点，check_point_是已经写入到sst文件里
-  uint64_t check_log_;
+  uint64_t check_point_;//vlog文件的重启点
+  uint64_t check_log_;//从那个vlog文件开始回放
   uint64_t drop_count_;//合并产生了多少条垃圾记录，这些新产生的信息还没有持久化到sst文件
   VlogManager vlog_manager_;
-  std::string vloginfo_;
-  uint64_t vloginfo_file_number_;
-  uint64_t vloginfo_pos_;
-//  log::VReader* vlog_reader_;//读vlog的包装类
-//  SequentialFile* vlog_reader_file_;//vlog文件读打开
+  std::string tail_info_;
   uint32_t seed_;                // For sampling.
 
   // Queue of writers.
   std::deque<Writer*> writers_;
   WriteBatch* tmp_batch_;
 
-  SnapshotList snapshots_;
+//  SnapshotList snapshots_;
 
   // Set of table files to protect from deletion because they are
   // part of ongoing compactions.
