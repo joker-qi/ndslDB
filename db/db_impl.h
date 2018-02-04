@@ -82,6 +82,8 @@ class DBImpl : public DB {
   {
       return shutting_down_.Acquire_Load();
   }
+  int TotalVlogFiles();
+  uint64_t GetVlogNumber();
  private:
   friend class DB;
   friend class GarbageCollector;
@@ -173,8 +175,9 @@ class DBImpl : public DB {
   uint64_t check_point_;//vlog文件的重启点
   uint64_t check_log_;//从那个vlog文件开始回放
   uint64_t drop_count_;//合并产生了多少条垃圾记录，这些新产生的信息还没有持久化到sst文件
+  uint64_t recover_clean_vlog_number_;
+  uint64_t recover_clean_pos_;
   VlogManager vlog_manager_;
-  std::string tail_info_;
   uint32_t seed_;                // For sampling.
 
   // Queue of writers.

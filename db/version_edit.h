@@ -57,6 +57,7 @@ class VersionEdit {
   }
   void SetHeadInfo(uint64_t logfile_number, uint64_t check_point)
   {
+ //     memset(head_info_, 0, sizeof(head_info_));
       EncodeFixed64(head_info_, (check_point << 24) | logfile_number);
       has_head_info_ = true;
   }

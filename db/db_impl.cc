@@ -135,8 +135,11 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       vlog_(NULL),
       vlogfile_(NULL),
       vlog_head_(0),
+      check_log_(0),
       check_point_(0),
       drop_count_(0),
+      recover_clean_vlog_number_(0),
+      recover_clean_pos_(0),
       vlog_manager_(options_.clean_threshold),
       seed_(0),
       tmp_batch_(new WriteBatch),
@@ -286,6 +289,28 @@ void DBImpl::DeleteObsoleteFiles() {
   }
 }
 
+uint64_t DBImpl::GetVlogNumber()
+{
+    return logfile_number_;
+}
+
+int DBImpl::TotalVlogFiles()
+{
+    int res = 0;
+    std::vector<std::string> filenames;
+    uint64_t number;
+    FileType type;
+    env_->GetChildren(dbname_, &filenames);
+    for (size_t i = 0; i < filenames.size(); i++) {
+        if (ParseFileName(filenames[i], &number, &type))
+        {
+            if (type == kVLogFile)
+                res++;
+        }
+    }
+    return res;
+}
+
 Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   mutex_.AssertHeld();
 
@@ -314,15 +339,23 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
           dbname_, "exists (error_if_exists is true)");
     }
   }
-bool has_head_info = false;
-//bool has_vloginfo = false;
-uint64_t log_number, head_pos;
-std::string vloginfo;
-s = versions_->Recover(save_manifest, log_number, head_pos, has_head_info, vloginfo, tail_info_);//ruse manifest文件时save_manifest会继续保持false
 
-//  s = versions_->Recover(save_manifest);//ruse manifest文件时save_manifest会继续保持false
+  uint64_t log_number = 0, head_pos;
+  std::string vloginfo;
+  s = versions_->Recover(save_manifest, log_number, head_pos, vloginfo,
+          recover_clean_vlog_number_, recover_clean_pos_);//ruse manifest文件时save_manifest会继续保持false
+
   if (!s.ok()) {
     return s;
+  }
+  if(*save_manifest == true)//说明不重用manifest文件
+  {//防止新生成manifest文件时vloginfo,headinfo以及tailinfo信息丢失
+    if(!vloginfo.empty())
+        edit->SetVlogInfo(vloginfo);
+    if(recover_clean_vlog_number_ > 0)
+        edit->SetTailInfo(recover_clean_vlog_number_, recover_clean_pos_);
+    if(log_number > 0)
+        edit->SetHeadInfo(log_number, head_pos);
   }
   SequenceNumber max_sequence(0);
   const uint64_t min_log = versions_->LogNumber();
@@ -357,14 +390,13 @@ s = versions_->Recover(save_manifest, log_number, head_pos, has_head_info, vlogi
              static_cast<int>(expected.size()));
     return Status::Corruption(buf, TableFileName(dbname_, *(expected.begin())));
   }
-  //if(has_vloginfo)
   if(!vloginfo.empty())
   {
     vlog_manager_.Deserialize(vloginfo);
   }
 
   std::sort(logs.begin(), logs.end());
-  if(has_head_info && !logs.empty())
+  if(log_number > 0 && !logs.empty())
   {
     if(log_number == logs[0])
         vlog_head_ = head_pos;
@@ -1463,6 +1495,29 @@ Status DBImpl::MakeRoomForWrite(bool force) {
   assert(!writers_.empty());
   bool allow_delay = !force;
   Status s;
+      if(vlog_head_ >= options_.max_vlog_size)
+      {
+    //新生成的vlog文件的编号会和imm生成的sst文件一起应用到version中，见CompactMemTable
+         uint32_t new_log_number = versions_->NewVlogNumber();//对于newdb且不能重用上次的log(即不能logandapply新生成的log)，会有bug
+         vlog_head_ = 0;
+         WritableFile* vlfile;
+         s = env_->NewWritableFile(VLogFileName(dbname_, new_log_number), &vlfile);
+         if (!s.ok()) {
+            versions_->ReuseVlogNumber(new_log_number);
+ //           break;
+ return s;
+         }
+         delete vlog_;
+         delete vlogfile_;
+         vlogfile_ = vlfile;
+         logfile_number_ = new_log_number;
+         vlog_ = new log::VWriter(vlfile);
+          SequentialFile* vlr_file;
+          s = options_.env->NewSequentialFile(VLogFileName(dbname_, new_log_number), &vlr_file);
+          log::VReader* vlog_reader = new log::VReader(vlr_file, true,0);
+          vlog_manager_.AddVlog(new_log_number, vlog_reader);
+          Log(options_.info_log, "new vlog %d...\n", new_log_number);
+      }
   while (true) {
     if (!bg_error_.ok()) {
       // Yield previous error
@@ -1508,28 +1563,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mem_ = new MemTable(internal_comparator_);
       mem_->Ref();
       force = false;   // Do not force another compaction if have room
-      if(vlog_head_ >= options_.max_vlog_size)
-      {
-    //新生成的vlog文件的编号会和imm生成的sst文件一起应用到version中，见CompactMemTable
-         uint32_t new_log_number = versions_->NewVlogNumber();//对于newdb且不能重用上次的log(即不能logandapply新生成的log)，会有bug
-         vlog_head_ = 0;
-         WritableFile* vlfile;
-         s = env_->NewWritableFile(VLogFileName(dbname_, new_log_number), &vlfile);
-         if (!s.ok()) {
-            versions_->ReuseVlogNumber(new_log_number);
-            break;
-         }
-         delete vlog_;
-         delete vlogfile_;
-         vlogfile_ = vlfile;
-         logfile_number_ = new_log_number;
-         vlog_ = new log::VWriter(vlfile);
-          SequentialFile* vlr_file;
-          s = options_.env->NewSequentialFile(VLogFileName(dbname_, new_log_number), &vlr_file);
-          log::VReader* vlog_reader = new log::VReader(vlr_file, true,0);
-          vlog_manager_.AddVlog(new_log_number, vlog_reader);
-          Log(options_.info_log, "new vlog %d...\n", new_log_number);
-      }
       MaybeScheduleCompaction();
     }
   }
@@ -1663,20 +1696,11 @@ void DBImpl::BackgroundRecoverClean()
 {
     VersionEdit edit;
     bool save_edit = false;
-    if(!tail_info_.empty())
-    {
-        uint64_t code = DecodeFixed64(tail_info_.data());
-        uint64_t vlog_numb = code & 0xffffff;
-        uint64_t tail = code>>24;
-        if(vlog_manager_.NeedRecover(vlog_numb))
-        {
-            GarbageCollector garbager(this);
-            garbager.SetVlog(vlog_numb, tail);
-            garbager.BeginGarbageCollect(&edit, &save_edit);
-            if(!save_edit)
-                vlog_manager_.RemoveCleaningVlog(vlog_numb);
-        }
-    }
+    GarbageCollector garbager(this);
+    garbager.SetVlog(recover_clean_vlog_number_, recover_clean_pos_);
+    garbager.BeginGarbageCollect(&edit, &save_edit);
+    if(!save_edit)
+        vlog_manager_.RemoveCleaningVlog(recover_clean_vlog_number_);
 
     mutex_.Lock();
     if(save_edit)
@@ -1830,7 +1854,8 @@ Status DB::Open(const Options& options, const std::string& dbname,
     edit.SetLogNumber(impl->logfile_number_);
     s = impl->versions_->LogAndApply(&edit, &impl->mutex_);
   }
-  if (s.ok()) {
+  if (s.ok() && impl->recover_clean_vlog_number_ > 0 &&
+          impl->vlog_manager_.NeedRecover(impl->recover_clean_vlog_number_)) {
     impl->bg_clean_scheduled_ = true;
     impl->env_->StartThread(&DBImpl::BGCleanRecover, impl);
     impl->DeleteObsoleteFiles();

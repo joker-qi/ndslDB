@@ -612,7 +612,7 @@ TEST(DBTest,garbageAllCleanVlog)//测试CleanVlog()
     ASSERT_EQ("l1", Get("la"));
 }
 
-TEST(DBTest,garbage)////检验reopen时能否恢复vloginfo
+TEST(DBTest,garbagerefuse)//检验不重用manifest文件时，vloginfo headinfo tailinfo信息不会丢失
 {
     Options options = CurrentOptions();
     options.clean_threshold = 3;
@@ -627,16 +627,61 @@ TEST(DBTest,garbage)////检验reopen时能否恢复vloginfo
     ASSERT_OK(Put("bar", "b2"));
     dbfull()->TEST_CompactMemTable();//生成sst在第1层
     dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog而且只有2条垃圾信息
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
+    ASSERT_EQ(NumTableFilesAtLevel(2), 1);//第2层的文件就是big/11  以及前面1和2层合并后的文件
+    ASSERT_EQ(NumTableFilesAtLevel(0), 0);
     Reopen(&options);
+    Reopen(&options);
+    ASSERT_EQ(NumTableFilesAtLevel(0), 0);
     std::string big(1000,'1');
     ASSERT_OK(Put("big", big));
-    ASSERT_OK(Put("bar", "b3"));
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
+    ASSERT_OK(Put("bar", "b3"));//bar是写在新log文件里
+    ASSERT_EQ(2, dbfull()->TotalVlogFiles());
+
     dbfull()->TEST_CompactMemTable();//生成sst在第1层,生成新的vlog2
     ASSERT_EQ(NumTableFilesAtLevel(2), 1);//第2层的文件就是big/11  以及前面1和2层合并后的文件
     ASSERT_EQ(NumTableFilesAtLevel(1), 1);
+ //   ASSERT_EQ(2, dbfull()->GetVlogNumber());
     dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，多了一条垃圾记录bar，刚好够3，会触发vlog1的垃圾回收
     //能触发垃圾回收说明vloginfo数据在reopen时成功恢复了
     DelayMilliseconds(100);//等垃圾回收完成
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
+    ASSERT_EQ("v3", Get("foo"));
+    ASSERT_EQ(big, Get("big"));
+    ASSERT_EQ("b3", Get("bar"));
+}
+
+TEST(DBTest,garbage)//检验reopen时能否恢复vloginfo
+{
+    Options options = CurrentOptions();
+    options.clean_threshold = 3;
+    options.max_vlog_size = 1000;
+    options.log_dropCount_threshold = 1;
+    Reopen(&options);
+    ASSERT_OK(Put("foo", "v1"));
+    ASSERT_OK(Put("bar", "b1"));
+    ASSERT_OK(Put("la", "l1"));
+    dbfull()->TEST_CompactMemTable();//生成sst，在第2层
+    ASSERT_OK(Put("foo", "v3"));
+    ASSERT_OK(Put("bar", "b2"));
+    dbfull()->TEST_CompactMemTable();//生成sst在第1层
+    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，不会触发垃圾回收，因为是当前vlog而且只有2条垃圾信息
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
+    Reopen(&options);
+    std::string big(1000,'1');
+    ASSERT_OK(Put("big", big));
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
+    ASSERT_OK(Put("bar", "b3"));//bar是写在新log文件里
+    ASSERT_EQ(2, dbfull()->TotalVlogFiles());
+    dbfull()->TEST_CompactMemTable();//生成sst在第1层,生成新的vlog2
+    ASSERT_EQ(NumTableFilesAtLevel(2), 1);//第2层的文件就是big/11  以及前面1和2层合并后的文件
+    ASSERT_EQ(NumTableFilesAtLevel(1), 1);
+ //   ASSERT_EQ(2, dbfull()->GetVlogNumber());
+    dbfull()->TEST_CompactRange(1, NULL, NULL);//导致1和2层合并，多了一条垃圾记录bar，刚好够3，会触发vlog1的垃圾回收
+    //能触发垃圾回收说明vloginfo数据在reopen时成功恢复了
+    DelayMilliseconds(100);//等垃圾回收完成
+    ASSERT_EQ(1, dbfull()->TotalVlogFiles());
     ASSERT_EQ("v3", Get("foo"));
     ASSERT_EQ(big, Get("big"));
     ASSERT_EQ("b3", Get("bar"));
