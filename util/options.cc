@@ -25,15 +25,14 @@ Options::Options()
       compression(kSnappyCompression),
       reuse_logs(false),
       filter_policy(NULL),
-      clean_write_buffer_size(128<<10),
+      clean_write_buffer_size(128<<10),//垃圾回收的写缓冲区，必须要大于12
      // clean_write_buffer_size(12),
-      clean_threshold(1*1024 * 1024),//log文件垃圾记录条数达到多少条时开始进行垃圾回收
+      clean_threshold(300*1024 * 1024),//vlog文件垃圾记录条数达到多少条时开始进行垃圾回收
      // clean_threshold(1*124 * 1024),
-      min_clean_threshold(clean_threshold/5),//log进行手动清理时，只有文件垃圾记录条数达到min_clean_threshold才会清理
-      log_dropCount_threshold(100),//合并后新产生log_dropCount_threshold条垃圾记录时记录各个log文件的信息
-      max_vlog_size(1024*1024*1024){//log文件大小上限值
+      min_clean_threshold(clean_threshold/5),//vlog进行手动清理时，只有文件垃圾记录条数达到min_clean_threshold才会清理
+      log_dropCount_threshold(100),//与持久化vloginfo有关的，合并后新产生log_dropCount_threshold条垃圾记录时持久化vloginfo
+      max_vlog_size(1024*1024*1024){//vlog文件大小上限值
  //     max_vlog_size(124*1024*1024){
- //     clean_threshold(0xffffffffffff){
 }
 
 }  // namespace leveldb
