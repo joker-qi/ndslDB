@@ -133,8 +133,10 @@ class PosixSequentialFile: public SequentialFile {
   }
   virtual Status DeallocateDiskSpace(uint64_t offset, size_t len)
   {//释放指定磁盘空间
+#if defined(OS_LINUX)
       if(fallocate(fileno(file_),FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE, offset, len)<0)
           return PosixError(filename_, errno);
+#endif
       return Status::OK();
   }
 };

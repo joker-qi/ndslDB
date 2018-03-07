@@ -10,7 +10,7 @@ namespace leveldb {
 
     VlogManager::~VlogManager()
     {
-        std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
+        std::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
         for(;iter != manager_.end();iter++)
         {
             delete iter->second.vlog_;
@@ -34,7 +34,7 @@ namespace leveldb {
 
     void VlogManager::RemoveCleaningVlog(uint64_t vlog_numb)//与GetVlogsToClean对应
     {
-        std::tr1::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (vlog_numb);
+        std::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (vlog_numb);
         delete iter->second.vlog_;
         manager_.erase(iter);
         cleaning_vlog_set_.erase(vlog_numb);
@@ -42,7 +42,7 @@ namespace leveldb {
 
     void VlogManager::AddDropCount(uint64_t vlog_numb)
     {
-         std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.find (vlog_numb);
+         std::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.find (vlog_numb);
          if(iter != manager_.end())
          {
             iter->second.count_++;
@@ -56,7 +56,7 @@ namespace leveldb {
     std::set<uint64_t> VlogManager::GetVlogsToClean(uint64_t clean_threshold)
     {
         std::set<uint64_t> res;
-        std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
+        std::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
         for(;iter != manager_.end();iter++)
         {
             if(iter->second.count_ >= clean_threshold && iter->first != now_vlog_)
@@ -67,14 +67,14 @@ namespace leveldb {
 
     uint64_t VlogManager::GetVlogToClean()
     {
-       std::tr1::unordered_set<uint64_t>::iterator iter = cleaning_vlog_set_.begin();
+       std::unordered_set<uint64_t>::iterator iter = cleaning_vlog_set_.begin();
        assert(iter != cleaning_vlog_set_.end());
        return *iter;
     }
 
     log::VReader* VlogManager::GetVlog(uint64_t vlog_numb)
     {
-        std::tr1::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (vlog_numb);
+        std::unordered_map<uint64_t, VlogInfo>::const_iterator iter = manager_.find (vlog_numb);
         if(iter == manager_.end())
             return NULL;
         else
@@ -93,7 +93,7 @@ namespace leveldb {
         if(size == 0)
             return false;
 
-        std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
+        std::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.begin();
         for(;iter != manager_.end();iter++)
         {
             char buf[8];
@@ -126,7 +126,7 @@ namespace leveldb {
 
     bool VlogManager::NeedRecover(uint64_t vlog_numb)
     {
-        std::tr1::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.find(vlog_numb);
+        std::unordered_map<uint64_t, VlogInfo>::iterator iter = manager_.find(vlog_numb);
         if(iter != manager_.end())
         {
             assert(iter->second.count_ >= clean_threshold_);

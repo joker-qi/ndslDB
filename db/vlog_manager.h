@@ -1,8 +1,8 @@
 #ifndef STORAGE_LEVELDB_DB_VLOG_MANAGER_H_
 #define STORAGE_LEVELDB_DB_VLOG_MANAGER_H_
 
-#include <tr1/unordered_map>
-#include <tr1/unordered_set>
+#include <unordered_map>
+#include <unordered_set>
 #include "db/vlog_reader.h"
 #include <set>
 
@@ -32,8 +32,8 @@ class VlogManager
         bool Deserialize(std::string& val);
         bool NeedRecover(uint64_t vlog_numb);
     private:
-        std::tr1::unordered_map<uint64_t, VlogInfo> manager_;
-        std::tr1::unordered_set<uint64_t> cleaning_vlog_set_;
+        std::unordered_map<uint64_t, VlogInfo> manager_;
+        std::unordered_set<uint64_t> cleaning_vlog_set_;
         uint64_t clean_threshold_;
         uint64_t now_vlog_;
 };
