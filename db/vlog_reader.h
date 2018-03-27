@@ -41,7 +41,7 @@ class VReader {
   bool DeallocateDiskSpace(uint64_t offset, size_t len);//释放offset偏移处len长的磁盘空间
 
  private:
-  port::Mutex mutex_;
+////  port::Muex mutex_;
   SequentialFile* const file_;//要读的文件
   Reporter* const reporter_;//用于报告错误的
   bool const checksum_;//是否进行数据校验

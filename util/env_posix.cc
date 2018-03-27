@@ -117,7 +117,20 @@ class PosixSequentialFile: public SequentialFile {
     }
     return s;
   }
-
+  virtual Status Pread(uint64_t offset, size_t n, Slice* result, char* scratch)
+  {
+    int fd = fileno(file_);
+    if(fd == -1)
+    {
+        return PosixError(filename_, errno);
+    }
+    Status s;
+    ssize_t r = pread(fd, scratch, n, static_cast<off_t>(offset));
+    if (r < 0) {
+        s = PosixError(filename_, errno);
+    }
+    return s;
+  }
   virtual Status Skip(uint64_t n) {
     if (fseek(file_, n, SEEK_CUR)) {
       return PosixError(filename_, errno);

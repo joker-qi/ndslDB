@@ -183,7 +183,10 @@ class SequentialFile {
   //
   // REQUIRES: External synchronization
   virtual Status Read(size_t n, Slice* result, char* scratch) = 0;
-
+  virtual Status Pread(uint64_t offset, size_t n, Slice* result, char* scratch)
+  {
+      return Status::NotSupported("Pread");
+  }
   // Skip "n" bytes from the file. This is guaranteed to be no
   // slower that reading the same data, but may be faster.
   //

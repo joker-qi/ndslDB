@@ -186,13 +186,14 @@ bool VReader::ReadRecord(Slice* record, std::string* scratch, int& head_size)
 
 //get查询中根据索引从vlog文件中读value值
 bool VReader::Read(char* val, size_t size, size_t pos)
-{//要考虑多线程情况
-    MutexLock l(&mutex_);
-    if (!SkipToPos(pos)) {//因为read读的位置随机，因此file的skip接口不行，因为file的skip是相对于当前位置的
-      return false;
-    }
+{/*//要考虑多线程情况*/
+    //MutexLock l(&mutex_);
+    //if (!SkipToPos(pos)) {//因为read读的位置随机，因此file的skip接口不行，因为file的skip是相对于当前位置的
+      //return false;
+    /*}*/
     Slice buffer;
-    Status status = file_->Read(size, &buffer, val);
+   // Status status = file_->Read(size, &buffer, val);
+    Status status =  file_->Pread(pos, size, &buffer, val);
     if (!status.ok() || buffer.size() != size)
     {
         ReportDrop(size, status);
