@@ -190,3 +190,32 @@ Compaction过程需要被删除的数据由于只是删除了Key，Value还保�
     
 
 让我很吃惊的是在线回收后性能并没有啥变化，虽然垃圾回收是大块的读跟大块的写，但感觉多少会有点影响把，可能是哪里有bug把，后续继续检查。
+
+LevelDB:    version 1.20
+Date:       Mon Jul 29 10:37:23 2019
+CPU:        12 * Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+CPUCache:   12288 KB
+Keys:       16 bytes each
+Values:     1000000 bytes each (1000000 bytes after compression)
+Entries:    10000
+RawSize:    9536.9 MB (estimated)
+FileSize:   9536.9 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+fillseq      :   10216.098 micros/op;   93.4 MB/s   
+fillrandom   :   11328.930 micros/op;   84.2 MB/s   
+overwrite    :   14751.239 micros/op;   64.7 MB/s   
+readrandom   :     111.806 micros/op; (10000 of 10000 found)
+readrandom   :     115.297 micros/op; (10000 of 10000 found)
+readseq      :     106.751 micros/op; 8933.7 MB/s  
+readreverse  :     109.931 micros/op; 8675.3 MB/s  
+compact      : 11096754.000 micros/op;
+readrandom   :     106.331 micros/op; (10000 of 10000 found)
+readseq      :     106.443 micros/op; 8959.6 MB/s  
+readreverse  :     108.632 micros/op; 8779.1 MB/s  
+fill100K     :     695.000 micros/op;  137.2 MB/s (10 ops)
+crc32c       :       0.470 micros/op; 8312.7 MB/s (4K per op)
+snappycomp   :    2746.000 micros/op; (snappy failure)
+snappyuncomp :    2753.000 micros/op; (snappy failure)
+acquireload  :       0.246 micros/op; (each op is 1000 loads)
+
