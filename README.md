@@ -191,6 +191,7 @@ Compaction过程需要被删除的数据由于只是删除了Key，Value还保�
 
 让我很吃惊的是在线回收后性能并没有啥变化，虽然垃圾回收是大块的读跟大块的写，但感觉多少会有点影响把，可能是哪里有bug把，后续继续检查。
 
+```
 LevelDB:    version 1.20
 Date:       Mon Jul 29 10:37:23 2019
 CPU:        12 * Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
@@ -218,4 +219,4 @@ crc32c       :       0.470 micros/op; 8312.7 MB/s (4K per op)
 snappycomp   :    2746.000 micros/op; (snappy failure)
 snappyuncomp :    2753.000 micros/op; (snappy failure)
 acquireload  :       0.246 micros/op; (each op is 1000 loads)
-
+```
