@@ -193,7 +193,6 @@ Compaction过程需要被删除的数据由于只是删除了Key，Value还保�
 
 ```
 LevelDB:    version 1.20
-Date:       Mon Jul 29 10:37:23 2019
 CPU:        12 * Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
 CPUCache:   12288 KB
 Keys:       16 bytes each
@@ -203,6 +202,27 @@ RawSize:    9536.9 MB (estimated)
 FileSize:   9536.9 MB (estimated)
 WARNING: Snappy compression is not enabled
 ------------------------------------------------
+
+LevelDB:
+fillseq      :  206345.297 micros/op;    4.6 MB/s   
+fillsync     :  176954.500 micros/op;    5.4 MB/s (10 ops)
+fillrandom   : 1146710.025 micros/op;    0.8 MB/s   
+overwrite    : 1725943.474 micros/op;    0.6 MB/s   
+readrandom   :     113.477 micros/op; (10000 of 10000 found)
+readrandom   :     116.420 micros/op; (10000 of 10000 found)
+readseq      :      18.721 micros/op; 50942.8 MB/s 
+readreverse  :     159.408 micros/op; 5982.7 MB/s  
+compact      : 1922665479.000 micros/op;
+readrandom   :     112.581 micros/op; (10000 of 10000 found)
+readseq      :      12.984 micros/op; 73452.3 MB/s 
+readreverse  :     106.440 micros/op; 8959.9 MB/s  
+fill100K     :     766.700 micros/op;  124.4 MB/s (10 ops)
+crc32c       :       0.933 micros/op; 4186.9 MB/s (4K per op)
+snappycomp   :    2925.000 micros/op; (snappy failure)
+snappyuncomp :    2713.000 micros/op; (snappy failure)
+
+
+ndslDB:
 fillseq      :   10216.098 micros/op;   93.4 MB/s   
 fillrandom   :   11328.930 micros/op;   84.2 MB/s   
 overwrite    :   14751.239 micros/op;   64.7 MB/s   
