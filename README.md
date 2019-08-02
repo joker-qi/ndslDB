@@ -204,21 +204,43 @@ RawSize:    9536.9 MB (estimated)
 FileSize:   9536.9 MB (estimated)
 WARNING: Snappy compression is not enabled
 ------------------------------------------------
+
+ndslDB:
+fillseq      :   10216.098 micros/op;   93.4 MB/s   
+fillrandom   :   11328.930 micros/op;   84.2 MB/s   
+overwrite    :   14751.239 micros/op;   64.7 MB/s   
+readrandom   :     111.806 micros/op; (10000 of 10000 found)
+readrandom   :     115.297 micros/op; (10000 of 10000 found)
+readseq      :     106.751 micros/op; 8933.7 MB/s  
+readreverse  :     109.931 micros/op; 8675.3 MB/s  
+compact      : 11096754.000 micros/op;
+readrandom   :     106.331 micros/op; (10000 of 10000 found)
+readseq      :     106.443 micros/op; 8959.6 MB/s  
+readreverse  :     108.632 micros/op; 8779.1 MB/s  
+fill100K     :     695.000 micros/op;  137.2 MB/s (10 ops)
+crc32c       :       0.470 micros/op; 8312.7 MB/s (4K per op)
+snappycomp   :    2746.000 micros/op; (snappy failure)
+snappyuncomp :    2753.000 micros/op; (snappy failure)
+acquireload  :       0.246 micros/op; (each op is 1000 loads)
+
+LevelDB:
+fillseq      :  206345.297 micros/op;    4.6 MB/s   
+fillsync     :  176954.500 micros/op;    5.4 MB/s (10 ops)
+fillrandom   : 1146710.025 micros/op;    0.8 MB/s   
+overwrite    : 1725943.474 micros/op;    0.6 MB/s   
+readrandom   :     113.477 micros/op; (10000 of 10000 found)
+readrandom   :     116.420 micros/op; (10000 of 10000 found)
+readseq      :      18.721 micros/op; 50942.8 MB/s 
+readreverse  :     159.408 micros/op; 5982.7 MB/s  
+compact      : 1922665479.000 micros/op;
+readrandom   :     112.581 micros/op; (10000 of 10000 found)
+readseq      :      12.984 micros/op; 73452.3 MB/s 
+readreverse  :     106.440 micros/op; 8959.9 MB/s  
+fill100K     :     766.700 micros/op;  124.4 MB/s (10 ops)
+crc32c       :       0.933 micros/op; 4186.9 MB/s (4K per op)
+snappycomp   :    2925.000 micros/op; (snappy failure)
+snappyuncomp :    2713.000 micros/op; (snappy failure)
 ```
-item | LevelDB | ndslDB
---- | --- | ---
-fillseq | 206345.297 micros/op;    4.6 MB/s |10216.098 micros/op;   93.4 MB/s   
-fillrandom | 1146710.025 micros/op;    0.8 MB/s | 11328.930 micros/op;   84.2 MB/s 
-overwrite | 1725943.474 micros/op;    0.6 MB/s | 14751.239 micros/op;   64.7 MB/s
-readrandom | 113.477 micros/op; (10000 of 10000 found) | 111.806 micros/op; (10000 of 10000 found)
-readrandom | 116.420 micros/op; (10000 of 10000 found) | 115.297 micros/op; (10000 of 10000 found)
-readseq | 18.721 micros/op; 50942.8 MB/s | 106.751 micros/op; 8933.7 MB/s
-readreverse | 159.408 micros/op; 5982.7 MB/s | 109.931 micros/op; 8675.3 MB/s
-compact | 1922665479.000 micros/op | 11096754.000 micros/op
-readrandom | 12.581 micros/op; (10000 of 10000 found) | 106.331 micros/op; (10000 of 10000 found)
-readseq | 12.984 micros/op; 73452.3 MB/s | 106.443 micros/op; 8959.6 MB/s 
-readreverse | 106.440 micros/op; 8959.9 MB/s | 108.632 micros/op; 8779.1 MB/s  
-fill100K | 766.700 micros/op;  124.4 MB/s (10 ops) | 695.000 micros/op;  137.2 MB/s (10 ops)
 
 ## 测试环境5
 ```
@@ -233,6 +255,8 @@ RawSize:    953689.6 MB (estimated)
 FileSize:   953689.6 MB (estimated)
 WARNING: Snappy compression is not enabled
 ------------------------------------------------
+
+ndslDB:
 fillseq      :    1055.778 micros/op;  903.3 MB/s     
 fillrandom   :    1217.107 micros/op;  783.6 MB/s     
 overwrite    :    1343.768 micros/op;  709.7 MB/s             
@@ -243,6 +267,5 @@ readreverse  :   13626.581 micros/op;   70.0 MB/s
 compact      : 2513628.000 micros/op;
 readrandom   :    7725.241 micros/op; (1000000 of 1000000 found)
 readseq      :   14495.085 micros/op;   65.8 MB/s 
-
 total create 1848 vlogs, clean 12 vlogs (clean_threshold is 500, max_vlog_size is 1GB)
 ```
