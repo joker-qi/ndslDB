@@ -191,7 +191,7 @@ Compaction过程需要被删除的数据由于只是删除了Key，Value还保�
 
 让我很吃惊的是在线回收后性能并没有啥变化，虽然垃圾回收是大块的读跟大块的写，但感觉多少会有点影响把，可能是哪里有bug把，后续继续检查。
 
-## 测试环境4  大Value（1MB）性能测试
+## 测试环境4
 
 ```
 LevelDB:    version 1.20
@@ -219,3 +219,30 @@ readrandom | 12.581 micros/op; (10000 of 10000 found) | 106.331 micros/op; (1000
 readseq | 12.984 micros/op; 73452.3 MB/s | 106.443 micros/op; 8959.6 MB/s 
 readreverse | 106.440 micros/op; 8959.9 MB/s | 108.632 micros/op; 8779.1 MB/s  
 fill100K | 766.700 micros/op;  124.4 MB/s (10 ops) | 695.000 micros/op;  137.2 MB/s (10 ops)
+
+## 测试环境5
+```
+LevelDB:    version 1.20
+Date:       Thu Aug  1 18:59:56 2019
+CPU:        40 * Intel(R) Xeon(R) CPU E5-2660 v2 @ 2.20GHz
+CPUCache:   25600 KB
+Keys:       16 bytes each
+Values:     1000000 bytes each (1000000 bytes after compression)
+Entries:    1000000
+RawSize:    953689.6 MB (estimated)
+FileSize:   953689.6 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+fillseq      :    1055.778 micros/op;  903.3 MB/s     
+fillrandom   :    1217.107 micros/op;  783.6 MB/s     
+overwrite    :    1343.768 micros/op;  709.7 MB/s             
+readrandom   :    7678.822 micros/op; (1000000 of 1000000 found)
+readrandom   :    7684.597 micros/op; (1000000 of 1000000 found)
+readseq      :   14449.452 micros/op;   66.0 MB/s    
+readreverse  :   13626.581 micros/op;   70.0 MB/s    
+compact      : 2513628.000 micros/op;
+readrandom   :    7725.241 micros/op; (1000000 of 1000000 found)
+readseq      :   14495.085 micros/op;   65.8 MB/s 
+
+total create 1848 vlogs, clean 12 vlogs (clean_threshold is 500, max_vlog_size is 1GB)
+```
