@@ -268,4 +268,12 @@ compact      : 2513628.000 micros/op;
 readrandom   :    7725.241 micros/op; (1000000 of 1000000 found)
 readseq      :   14495.085 micros/op;   65.8 MB/s 
 total create 1848 vlogs, clean 12 vlogs (clean_threshold is 500, max_vlog_size is 1GB)
+
+LevelDB:
+fillseq      :    3107.244 micros/op;  306.9 MB/s     
+fillrandom   :   42515.387 micros/op;   22.4 MB/s     
+overwrite    :   52698.347 micros/op;   18.1 MB/s        
+readrandom   :   27331.724 micros/op; (1000000 of 1000000 found)
+max_file_size is 512MB
+
 ```
