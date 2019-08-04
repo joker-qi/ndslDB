@@ -256,7 +256,7 @@ FileSize:   953689.6 MB (estimated)
 WARNING: Snappy compression is not enabled
 ------------------------------------------------
 
-ndslDB:
+ndslDB:(clean_threshold = 500, max_vlog_size = 1GB)
 fillseq      :    1055.778 micros/op;  903.3 MB/s     
 fillrandom   :    1217.107 micros/op;  783.6 MB/s     
 overwrite    :    1343.768 micros/op;  709.7 MB/s             
@@ -267,13 +267,16 @@ readreverse  :   13626.581 micros/op;   70.0 MB/s
 compact      : 2513628.000 micros/op;
 readrandom   :    7725.241 micros/op; (1000000 of 1000000 found)
 readseq      :   14495.085 micros/op;   65.8 MB/s 
-total create 1848 vlogs, clean 12 vlogs (clean_threshold is 500, max_vlog_size is 1GB)
 
-LevelDB:
+ndslDB:(clean_threshold = 128, max_vlog_size = 512MB)
+fillseq      :    1295.228 micros/op;  736.3 MB/s    
+fillrandom   :    1111.186 micros/op;  858.3 MB/s   
+overwrite    :    1324.641 micros/op;  720.0 MB/s
+
+LevelDB:(max_file_size = 512MB)
 fillseq      :    3107.244 micros/op;  306.9 MB/s     
 fillrandom   :   42515.387 micros/op;   22.4 MB/s     
 overwrite    :   52698.347 micros/op;   18.1 MB/s        
 readrandom   :   27331.724 micros/op; (1000000 of 1000000 found)
-max_file_size is 512MB
 
 ```
