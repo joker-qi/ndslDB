@@ -190,3 +190,88 @@ Compaction过程需要被删除的数据由于只是删除了Key，Value还保�
     
 
 让我很吃惊的是在线回收后性能并没有啥变化，虽然垃圾回收是大块的读跟大块的写，但感觉多少会有点影响把，可能是哪里有bug把，后续继续检查。
+
+## 测试环境4
+
+```
+LevelDB:    version 1.20
+CPU:        12 * Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+CPUCache:   12288 KB
+Keys:       16 bytes each
+Values:     1000000 bytes each (1000000 bytes after compression)
+Entries:    10000
+RawSize:    9536.9 MB (estimated)
+FileSize:   9536.9 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+
+ndslDB:
+fillseq      :   10216.098 micros/op;   93.4 MB/s   
+fillrandom   :   11328.930 micros/op;   84.2 MB/s   
+overwrite    :   14751.239 micros/op;   64.7 MB/s   
+readrandom   :     111.806 micros/op; (10000 of 10000 found)
+readrandom   :     115.297 micros/op; (10000 of 10000 found)
+readseq      :     106.751 micros/op; 8933.7 MB/s  
+readreverse  :     109.931 micros/op; 8675.3 MB/s  
+compact      : 11096754.000 micros/op;
+readrandom   :     106.331 micros/op; (10000 of 10000 found)
+readseq      :     106.443 micros/op; 8959.6 MB/s  
+readreverse  :     108.632 micros/op; 8779.1 MB/s  
+fill100K     :     695.000 micros/op;  137.2 MB/s (10 ops)
+crc32c       :       0.470 micros/op; 8312.7 MB/s (4K per op)
+snappycomp   :    2746.000 micros/op; (snappy failure)
+snappyuncomp :    2753.000 micros/op; (snappy failure)
+acquireload  :       0.246 micros/op; (each op is 1000 loads)
+
+LevelDB:
+fillseq      :  206345.297 micros/op;    4.6 MB/s   
+fillsync     :  176954.500 micros/op;    5.4 MB/s (10 ops)
+fillrandom   : 1146710.025 micros/op;    0.8 MB/s   
+overwrite    : 1725943.474 micros/op;    0.6 MB/s   
+readrandom   :     113.477 micros/op; (10000 of 10000 found)
+readrandom   :     116.420 micros/op; (10000 of 10000 found)
+readseq      :      18.721 micros/op; 50942.8 MB/s 
+readreverse  :     159.408 micros/op; 5982.7 MB/s  
+compact      : 1922665479.000 micros/op;
+readrandom   :     112.581 micros/op; (10000 of 10000 found)
+readseq      :      12.984 micros/op; 73452.3 MB/s 
+readreverse  :     106.440 micros/op; 8959.9 MB/s  
+fill100K     :     766.700 micros/op;  124.4 MB/s (10 ops)
+crc32c       :       0.933 micros/op; 4186.9 MB/s (4K per op)
+snappycomp   :    2925.000 micros/op; (snappy failure)
+snappyuncomp :    2713.000 micros/op; (snappy failure)
+```
+
+## 测试环境5
+```
+LevelDB:    version 1.20
+Date:       Thu Aug  1 18:59:56 2019
+CPU:        40 * Intel(R) Xeon(R) CPU E5-2660 v2 @ 2.20GHz
+CPUCache:   25600 KB
+Keys:       16 bytes each
+Values:     1000000 bytes each (1000000 bytes after compression)
+Entries:    1000000
+RawSize:    953689.6 MB (estimated)
+FileSize:   953689.6 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+
+ndslDB:(max_file_size = 256KB, clean_threshold = 128, max_vlog_size = 512MB)
+fillseq      :    1130.646 micros/op;  843.5 MB/s    
+fillrandom   :    1409.760 micros/op;  676.5 MB/s 
+overwrite    :    1085.242 micros/op;  878.8 MB/s          
+readrandom   :    7678.822 micros/op; (1000000 of 1000000 found)
+readrandom   :    7684.597 micros/op; (1000000 of 1000000 found)
+readseq      :   14449.452 micros/op;   66.0 MB/s    
+readreverse  :   13626.581 micros/op;   70.0 MB/s    
+compact      : 2513628.000 micros/op;
+readrandom   :    7725.241 micros/op; (1000000 of 1000000 found)
+readseq      :   14495.085 micros/op;   65.8 MB/s 
+
+LevelDB:(max_file_size = 512MB)
+fillseq      :    3107.244 micros/op;  306.9 MB/s     
+fillrandom   :   42515.387 micros/op;   22.4 MB/s     
+overwrite    :   52698.347 micros/op;   18.1 MB/s        
+readrandom   :   27331.724 micros/op; (1000000 of 1000000 found)
+
+```
